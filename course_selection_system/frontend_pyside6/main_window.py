@@ -138,9 +138,9 @@ class MainWindow(QMainWindow):
         from frontend_pyside6.admin_students import AdminStudentsPage
         from frontend_pyside6.admin_teachers import AdminTeachersPage
         from frontend_pyside6.admin_courses import AdminCoursesPage
-        from frontend_pyside6.course_plans import CoursePlansPage
-        from frontend_pyside6.enrollment_control import EnrollmentControlPage
-        from frontend_pyside6.enrollment_stats import EnrollmentStatsPage
+        from frontend_pyside6.admin_course_plans import CoursePlansPage
+        from frontend_pyside6.admin_enrollment_control import EnrollmentControlPage
+        from frontend_pyside6.admin_enrollment_stats import EnrollmentStatsPage
         from frontend_pyside6.admin_grade_audit import AdminGradeAuditPage
         from frontend_pyside6.admin_logs import AdminLogsPage
         from frontend_pyside6.teacher_courses import TeacherCoursesPage

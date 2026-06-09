@@ -1,5 +1,5 @@
 """
-controllers/student_controller.py - 学生业务控制器
+backend/controllers/student_controller.py - 学生业务控制器
 
 提供学生专属业务逻辑：可选课程查询、已选课程查询、成绩查询等。
 """

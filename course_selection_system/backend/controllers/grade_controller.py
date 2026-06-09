@@ -1,5 +1,5 @@
 """
-controllers/grade_controller.py - 成绩管理控制器
+backend/controllers/grade_controller.py - 成绩管理控制器
 
 负责成绩录入、批量导入、成绩修改申请、成绩审核等业务逻辑。
 所有写操作使用数据库事务控制，并写入操作日志。

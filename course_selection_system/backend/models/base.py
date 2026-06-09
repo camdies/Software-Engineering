@@ -1,5 +1,5 @@
 """
-models/base.py - 数据库连接基础模块
+backend/models/base.py - 数据库连接基础模块
 
 提供SQLAlchemy Engine、Session工厂及数据库会话上下文管理器。
 采用单例模式管理数据库连接，从backend/config/config.ini读取数据库配置。

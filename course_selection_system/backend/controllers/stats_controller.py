@@ -1,5 +1,5 @@
 """
-controllers/stats_controller.py - 统计分析控制器
+backend/controllers/stats_controller.py - 统计分析控制器
 
 提供成绩统计分析、学业统计、成绩分布统计等功能。
 所有SQL查询使用参数化查询防止注入。

@@ -1,5 +1,5 @@
 """
-controllers/admin_controller.py - 管理员业务控制器
+backend/controllers/admin_controller.py - 管理员业务控制器
 
 提供管理员专属业务逻辑：用户管理、课程管理、开课计划管理、
 选课时段控制、数据备份等。

@@ -1,5 +1,5 @@
 """
-controllers/teacher_controller.py - 教师业务控制器
+backend/controllers/teacher_controller.py - 教师业务控制器
 
 提供教师专属业务逻辑：授课信息查询、成绩录入等。
 """
