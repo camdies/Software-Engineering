@@ -31,17 +31,13 @@ NAV_ITEMS = {
     ],
     "课程管理": [
         ("课程信息", "courses"),
-        ("开课计划", "course_plans"),
     ],
     "选课管理": [
-        ("时段控制", "enroll_period"),
-        ("选课统计", "enroll_stats"),
     ],
     "成绩管理": [
         ("成绩审核", "grade_audit"),
     ],
     "系统管理": [
-        ("数据备份", "backup"),
         ("操作日志", "logs"),
     ],
 }

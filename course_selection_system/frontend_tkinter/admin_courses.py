@@ -273,7 +273,6 @@ class AdminCoursesPage(tk.Frame):
             try:
                 from backend.models.base import DatabaseManager
                 from backend.models.course import Course
-                from backend.utils.auth_util import hash_password
 
                 data = dialog.result
                 db = DatabaseManager.get_instance()
