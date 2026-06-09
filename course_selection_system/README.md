@@ -10,7 +10,8 @@
 |------|------|
 | **双前端版本** | Tkinter 版（零外部依赖）和 PySide6 版（专业UI），后端代码100%共享 |
 | **三种角色** | 管理员（系统管理）、教师（成绩录入与统计）、学生（选课与查分） |
-| **并发安全** | 选课使用 `SELECT ... FOR UPDATE` 行级锁，防止超额选课 |
+| **双数据库支持** | Microsoft SQL Server 2025（默认） / MySQL 5.7+，config.ini 一键切换 |
+| **并发安全** | 选课使用行级锁（SQL Server: READ COMMITTED; MySQL: SELECT FOR UPDATE） |
 | **成绩审核流** | 教师提交修改申请 → 管理员审核通过/驳回 → 成绩更正 |
 | **审计追溯** | 所有关键操作（登录/选课/成绩/系统）写入 operation_log 表 |
 | **绩点计算** | 8级绩点映射（90-100→4.0, 85-89→3.7, ..., 0-59→0.0）|
@@ -24,7 +25,8 @@
 | GUI框架 | Python标准库 tkinter | PySide6 6.6+ |
 | 后端 | backend/ (共享) | backend/ (共享) |
 | ORM | SQLAlchemy 2.0+ | SQLAlchemy 2.0+ |
-| 数据库 | MySQL 5.7+ / MariaDB 10.3+ | 同左 |
+| 数据库 | SQL Server 2025（默认） | 同左 |
+| 数据库驱动 | pyodbc + ODBC Driver 18 | 同左 |
 | 密码加密 | bcrypt 4.0+ (12 rounds) | 同左 |
 | Excel处理 | openpyxl 3.1+ | 同左 |
 
@@ -34,47 +36,83 @@
 
 ### 1. 环境要求
 
-- **Python**: 3.10 或更高版本
-- **MySQL**: 5.7+ 或 MariaDB 10.3+
-- **pip**: 最新版本
+| 组件 | 要求 |
+|------|------|
+| Python | 3.10 或更高版本 |
+| 数据库 | **SQL Server 2025** (默认) 或 MySQL 5.7+ |
+| 管理工具 | SSMS 2022 (SQL Server) 或 Navicat (MySQL) |
+| 数据库驱动 | **ODBC Driver 18 for SQL Server** (SQL Server) |
+| pip | 最新版本 |
 
-### 2. 克隆项目并安装依赖
+### 2. 安装 Python 依赖
 
 ```bash
 cd course_selection_system
 pip install -r requirements.txt
 ```
 
-### 3. MySQL 数据库初始化
+### 3. 数据库安装与初始化
+
+#### 方案 A: SQL Server 2025（默认）
+
+**详细安装步骤参见**: [`docs/SQL_SERVER_SETUP_GUIDE.md`](docs/SQL_SERVER_SETUP_GUIDE.md)
+
+快速流程：
 
 ```bash
-# 方式一: 命令行导入
-mysql -u root -p < backend/config/init_database.sql
+# 1. 安装 SQL Server 2025 Developer Edition + SSMS 2022 + ODBC Driver 18
+#    详见 docs/SQL_SERVER_SETUP_GUIDE.md
 
-# 方式二: 在MySQL客户端中执行
-# source backend/config/init_database.sql;
+# 2. 在 SSMS 中打开并执行初始化脚本
+#    文件: backend/config/init_database.sql
+#    按 F5 执行
+
+# 3. 编辑 config.ini 填入 SQL Server 连接信息
+#    driver=mssql, host=localhost, port=1433, user=sa, password=你的密码
 ```
 
-初始化脚本会自动创建 `course_management_db` 数据库，包含：
+初始化脚本会自动创建 `CourseManagementDB` 数据库，包含：
 - 8 张数据表（user_account / student / teacher / course / course_plan / enrollment / grade / operation_log）
-- 全部外键约束、索引
+- 全部外键约束、索引、CHECK 约束
 - 测试数据（1个管理员 + 2个教师 + 3个学生 + 5门课程 + 5条开课计划 + 8条选课记录）
+
+#### 方案 B: MySQL（可选）
+
+```bash
+# 创建数据库并导入
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS course_management_db DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u root -p course_management_db < backend/config/init_database_mysql.sql
+
+# 修改 config.ini
+# driver=mysql, host=localhost, port=3306, user=root, password=你的密码, database=course_management_db
+```
 
 ### 4. 修改配置文件
 
 编辑 `backend/config/config.ini`：
 
+**SQL Server:**
 ```ini
 [database]
+driver = mssql
+host = localhost
+port = 1433
+user = sa
+password = your_sa_password
+database = CourseManagementDB
+pool_size = 10
+```
+
+**MySQL:**
+```ini
+[database]
+driver = mysql
 host = localhost
 port = 3306
 user = root
 password = your_mysql_password
 database = course_management_db
-
-[enrollment]
-# 是否需要打开选课开关（测试选课功能时设为 true）
-is_open = true
+pool_size = 10
 ```
 
 ### 5. 启动应用
@@ -87,7 +125,19 @@ python run_tkinter.py
 python run_pyside6.py
 ```
 
-### 6. 测试账号
+### 6. 运行测试
+
+```bash
+# 运行全部测试
+python tests/run_all.py
+
+# 运行单个测试模块
+python -m unittest tests.test_auth
+python -m unittest tests.test_enrollment
+python -m unittest tests.test_grade
+```
+
+### 7. 测试账号
 
 | 角色 | 账号 | 密码 | 说明 |
 |------|------|------|------|
@@ -97,6 +147,26 @@ python run_pyside6.py
 | 学生 | STU001 | 123456 | 选课、查成绩 |
 | 学生 | STU002 | 123456 | 同上 |
 | 学生 | STU003 | 123456 | 同上 |
+
+---
+
+## 数据库驱动切换
+
+系统支持 SQL Server 和 MySQL 双驱动，一键切换：
+
+| 配置项 | SQL Server | MySQL |
+|--------|------------|-------|
+| `driver` | `mssql` | `mysql` |
+| `port` | `1433` | `3306` |
+| 驱动层 | pyodbc + ODBC Driver 18 | PyMySQL |
+| 连接字符串 | `mssql+pyodbc://...` | `mysql+pymysql://...` |
+| DDL脚本 | `init_database.sql`（T-SQL） | `init_database_mysql.sql`（MySQL） |
+| 主键自增 | IDENTITY(1,1) | AUTO_INCREMENT |
+| 并发控制 | READ COMMITTED 隔离级别 | SELECT ... FOR UPDATE |
+
+**切换步骤：**
+1. 修改 `config.ini` 中的 `driver`、`port`、`user`、`password`、`database`
+2. 重启应用即可，无需修改任何代码
 
 ---
 
@@ -110,13 +180,17 @@ course_selection_system/
 ├── requirements.txt            # Python依赖清单
 ├── README.md                   # 本文档
 │
+├── docs/                       # 文档
+│   └── SQL_SERVER_SETUP_GUIDE.md  # SQL Server 安装配置详细指南
+│
 ├── backend/                    # ★ 后端逻辑层（两个前端100%共享）
 │   ├── config/
-│   │   ├── config.ini          # 数据库、系统参数配置
-│   │   ├── settings.py         # 配置读取单例
-│   │   └── init_database.sql   # 数据库DDL + 测试数据
+│   │   ├── config.ini          # 数据库/系统参数配置
+│   │   ├── settings.py         # 配置读取（支持mssql/mysql双驱动）
+│   │   ├── init_database.sql   # SQL Server T-SQL DDL脚本
+│   │   └── init_database_mysql.sql  # MySQL DDL脚本（备选）
 │   ├── models/                 # ORM 数据模型（M层）
-│   │   ├── base.py             # SQLAlchemy Engine + Session管理
+│   │   ├── base.py             # SQLAlchemy引擎（支持mssql/mysql）
 │   │   ├── user_account.py     # 用户账号
 │   │   ├── student.py          # 学生信息
 │   │   ├── teacher.py          # 教师信息
@@ -138,7 +212,7 @@ course_selection_system/
 │       ├── log_util.py         # 日志配置
 │       ├── validator.py        # 输入校验
 │       ├── gpa_calculator.py   # 绩点计算
-│       ├── export_util.py      # Excel导出
+│       └── export_util.py      # Excel导出
 │
 ├── frontend_tkinter/           # ★ Tkinter 前端（Python标准库）
 │   ├── app.py                  # 应用入口
@@ -213,14 +287,14 @@ course_selection_system/
   校验1 — 选课时段: 当前时间 ∈ [open_time, close_time]
   校验2 — 重复选课: enrollment 表不存在 (student_id, plan_id) 且 status='已选'
   校验3 — 时间冲突: 解析 time_slot 字段比对
-  校验4 — 容量校验: SELECT ... FOR UPDATE 行级锁 → enrolled < capacity
+  校验4 — 容量校验: 行级锁 → enrolled < capacity
+            SQL Server: READ COMMITTED 隔离级别
+            MySQL: SELECT ... FOR UPDATE
   校验5 — 先修课: grade 表中每门 prerequisite 的 score >= 60
 
 全部通过后在同一事务中:
   INSERT enrollment + UPDATE course_plan.enrolled + 写日志
 ```
-
-**并发安全原理**: 当两个学生同时选最后一门课时，后执行的 `SELECT ... FOR UPDATE` 会被阻塞，等第一个事务提交后才看到已满的 `enrolled` 值，从而返回"容量已满"。
 
 ### 3. 成绩管理 (`grade_controller.py`)
 
@@ -270,7 +344,7 @@ course_selection_system/
 ### 配置 Python 解释器
 1. File → Settings → Project → Python Interpreter
 2. 选择 Python 3.10+ 解释器
-3. 安装依赖: 点击 `+` 搜索并安装 `PyMySQL`, `SQLAlchemy`, `bcrypt`, `openpyxl`, `PySide6`
+3. 安装依赖: `pip install -r requirements.txt`
 
 ### 配置运行
 1. Run → Edit Configurations → 添加 Python 配置
@@ -278,31 +352,14 @@ course_selection_system/
 3. **PySide6 版本**: Script path = `run_pyside6.py`
 4. Working directory = 项目根目录
 
-### 配置 MySQL 数据源
+### 配置数据库连接（PyCharm）
 1. View → Tool Windows → Database
-2. `+` → Data Source → MySQL
-3. Host: localhost, Port: 3306, User: root
-4. Database: course_management_db
-5. 测试连接 → OK
-
----
-
-## 运行测试
-
-```bash
-# 运行全部测试（17个用例）
-python tests/run_all.py
-
-# 运行单个测试模块
-python -m unittest tests.test_auth
-python -m unittest tests.test_enrollment
-python -m unittest tests.test_grade
-
-# 测试覆盖率
-pip install coverage
-coverage run tests/run_all.py
-coverage report -m
-```
+2. `+` → Data Source → **Microsoft SQL Server**
+3. Host: localhost, Port: 1433
+4. User: sa, Password: 你的密码
+5. Database: CourseManagementDB
+6. URL 模板: `jdbc:sqlserver://localhost:1433;database=CourseManagementDB`
+7. 测试连接 → OK
 
 ---
 
@@ -317,7 +374,7 @@ coverage report -m
 | 适合场景 | 快速部署、内网环境 | 正式交付、专业展示 |
 | 后端代码 | 100%共享 `backend/` | 100%共享 `backend/` |
 
-**两个版本的后端逻辑完全相同**，只在 `frontend_tkinter/` 和 `frontend_pyside6/` 目录中实现不同的UI层，均通过导入 `backend/` 包调用相同的控制器。
+**两个版本的后端逻辑完全相同**，只在 `frontend_tkinter/` 和 `frontend_pyside6/` 目录中实现不同的UI层。
 
 ---
 
@@ -336,4 +393,6 @@ coverage report -m
 - 生产部署前修改 `backend/config/config.ini` 中的数据库密码
 - 建议将 `config.ini` 加入 `.gitignore` 避免敏感信息泄露
 - 日志文件位于 `logs/` 目录，自动每日滚动，保留30天
+- SQL Server 需先安装 ODBC Driver 18，详见 `docs/SQL_SERVER_SETUP_GUIDE.md`
 - bcrypt 加密轮数当前为 12，可在 `auth_util.py` 中调整
+- SQL Server 模式下使用 `IDENTITY(1,1)` 自增主键，`NVARCHAR` 存储中文字符
