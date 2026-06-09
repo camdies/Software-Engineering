@@ -1,5 +1,5 @@
 """
-controllers/enrollment_controller.py - 选课核心控制器
+backend/controllers/enrollment_controller.py - 选课核心控制器
 
 负责选课/退课的核心业务逻辑，是本系统最关键的模块。
 严格保证并发安全：使用数据库行级锁（SELECT ... FOR UPDATE）

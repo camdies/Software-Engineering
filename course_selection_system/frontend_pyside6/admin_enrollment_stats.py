@@ -8,8 +8,6 @@ from PySide6.QtGui import QFont
 
 from backend.models.base import DatabaseManager
 from backend.models.course_plan import CoursePlan
-from backend.models.enrollment import Enrollment
-from backend.models.student import Student
 from backend.models.course import Course
 
 STYLE = """
