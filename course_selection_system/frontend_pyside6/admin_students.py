@@ -75,7 +75,6 @@ QComboBox {
 class AdminStudentsPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._main = parent
         self._controller = AdminController()
         self._page = 1
         self._page_size = 20

@@ -9,8 +9,6 @@ from PySide6.QtGui import QFont
 from backend.controllers.admin_controller import AdminController
 from backend.models.base import DatabaseManager
 from backend.models.course_plan import CoursePlan
-from backend.models.course import Course
-from backend.models.teacher import Teacher
 
 STYLE = """
 QLineEdit, QComboBox { padding: 6px 10px; border: 1px solid #bdbdbd; border-radius: 4px; font-size: 13px; background: white; }

@@ -139,7 +139,6 @@ course_selection_system/
 │       ├── validator.py        # 输入校验
 │       ├── gpa_calculator.py   # 绩点计算
 │       ├── export_util.py      # Excel导出
-│       └── db_util.py          # 数据库会话
 │
 ├── frontend_tkinter/           # ★ Tkinter 前端（Python标准库）
 │   ├── app.py                  # 应用入口
@@ -167,6 +166,9 @@ course_selection_system/
 │   ├── admin_students.py       # 学生信息管理
 │   ├── admin_teachers.py       # 教师信息管理
 │   ├── admin_courses.py        # 课程管理
+│   ├── admin_course_plans.py   # 开课计划管理
+│   ├── admin_enrollment_control.py  # 选课时段控制
+│   ├── admin_enrollment_stats.py    # 选课统计
 │   ├── admin_grade_audit.py    # 成绩审核
 │   ├── admin_logs.py           # 操作日志
 │   ├── teacher_courses.py      # 任课信息

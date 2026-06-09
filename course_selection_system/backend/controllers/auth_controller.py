@@ -1,5 +1,5 @@
 """
-controllers/auth_controller.py - 登录认证控制器
+backend/controllers/auth_controller.py - 登录认证控制器
 
 负责用户登录验证、登出、会话管理、密码修改等认证相关业务逻辑。
 所有操作写入operation_log审计日志。
