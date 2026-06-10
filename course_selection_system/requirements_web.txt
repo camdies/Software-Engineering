@@ -1,0 +1,6 @@
+# Web 版新增依赖
+# PySide6 和 PyQt5 在 Web 版中不再需要，但保留以免影响测试
+Flask>=3.0.0
+flask-cors>=4.0.0
+PyJWT>=2.8.0
+marshmallow>=3.20.0
