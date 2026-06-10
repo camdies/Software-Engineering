@@ -11,7 +11,7 @@ from frontend_pyside6.main_window import MainWindow
 
 def main():
     app = QApplication(sys.argv)
-    app.setFont(QFont("Microsoft YaHei", 9))
+    app.setFont(QFont("Microsoft YaHei", 10))
     try:
         DatabaseManager.get_instance().create_all_tables()
     except Exception as e:

@@ -207,12 +207,12 @@ GO
 
 -- 管理员
 INSERT INTO dbo.user_account (user_id, password_hash, role) VALUES
-('admin', '$2b$12$LJ3m4ys3Lk0TSwBCmBfO7OWCPNpLVKpDGS5yXhBXJBBx8sGLLtJQm', 'admin');
+('admin', '$2b$12$WTsX7QBi/h9qL6KYxwwORuwVT0AYCVmJDcZr8C0/UhQPbrR2snNnS', 'admin');
 
 -- 教师
 INSERT INTO dbo.user_account (user_id, password_hash, role) VALUES
-('T001', '$2b$12$LJ3m4ys3Lk0TSwBCmBfO7OWCPNpLVKpDGS5yXhBXJBBx8sGLLtJQm', 'teacher'),
-('T002', '$2b$12$LJ3m4ys3Lk0TSwBCmBfO7OWCPNpLVKpDGS5yXhBXJBBx8sGLLtJQm', 'teacher');
+('T001', '$2b$12$WTsX7QBi/h9qL6KYxwwORuwVT0AYCVmJDcZr8C0/UhQPbrR2snNnS', 'teacher'),
+('T002', '$2b$12$WTsX7QBi/h9qL6KYxwwORuwVT0AYCVmJDcZr8C0/UhQPbrR2snNnS', 'teacher');
 
 INSERT INTO dbo.teacher (teacher_id, name, college) VALUES
 ('T001', N'张教授', N'计算机科学与技术学院'),
@@ -220,9 +220,9 @@ INSERT INTO dbo.teacher (teacher_id, name, college) VALUES
 
 -- 学生
 INSERT INTO dbo.user_account (user_id, password_hash, role) VALUES
-('STU001', '$2b$12$LJ3m4ys3Lk0TSwBCmBfO7OWCPNpLVKpDGS5yXhBXJBBx8sGLLtJQm', 'student'),
-('STU002', '$2b$12$LJ3m4ys3Lk0TSwBCmBfO7OWCPNpLVKpDGS5yXhBXJBBx8sGLLtJQm', 'student'),
-('STU003', '$2b$12$LJ3m4ys3Lk0TSwBCmBfO7OWCPNpLVKpDGS5yXhBXJBBx8sGLLtJQm', 'student');
+('STU001', '$2b$12$WTsX7QBi/h9qL6KYxwwORuwVT0AYCVmJDcZr8C0/UhQPbrR2snNnS', 'student'),
+('STU002', '$2b$12$WTsX7QBi/h9qL6KYxwwORuwVT0AYCVmJDcZr8C0/UhQPbrR2snNnS', 'student'),
+('STU003', '$2b$12$WTsX7QBi/h9qL6KYxwwORuwVT0AYCVmJDcZr8C0/UhQPbrR2snNnS', 'student');
 
 INSERT INTO dbo.student (student_id, name, major, class_name) VALUES
 ('STU001', N'王小明', N'计算机科学与技术', N'计科2101'),

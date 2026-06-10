@@ -43,7 +43,25 @@ class DatabaseManager:
         self._engine = None
         self._Session = None
         self._driver = "mssql"
+        self._ensure_models_loaded()
         self._init_engine()
+
+    def _ensure_models_loaded(self):
+        """Import all models so string-based relationship() references resolve.
+
+        SQLAlchemy's declarative_base lazily configures mappers.  String-based
+        relationship("OtherModel") lookups fail at query-time if OtherModel
+        hasn't been imported yet.  Importing the full model tree here guarantees
+        every relationship is resolvable before any controller runs a query.
+        """
+        import backend.models.user_account  # noqa: F401
+        import backend.models.student       # noqa: F401
+        import backend.models.teacher       # noqa: F401
+        import backend.models.course        # noqa: F401
+        import backend.models.course_plan   # noqa: F401
+        import backend.models.enrollment    # noqa: F401
+        import backend.models.grade         # noqa: F401
+        import backend.models.operation_log # noqa: F401
 
     def _init_engine(self):
         """从配置文件读取参数并创建 SQLAlchemy Engine。
@@ -134,17 +152,12 @@ class DatabaseManager:
             logger.info("数据库连接池已释放")
 
     def create_all_tables(self):
-        """根据所有 Model 定义创建数据库表。"""
+        """根据所有 Model 定义创建数据库表。
+
+        _ensure_models_loaded() 在构造函数中已确保所有模型导入，
+        此处直接 create_all 即可。
+        """
         try:
-            # 导入所有模型以确保注册到 Base.metadata
-            import backend.models.user_account  # noqa
-            import backend.models.student      # noqa
-            import backend.models.teacher      # noqa
-            import backend.models.course       # noqa
-            import backend.models.course_plan  # noqa
-            import backend.models.enrollment   # noqa
-            import backend.models.grade        # noqa
-            import backend.models.operation_log  # noqa
             Base.metadata.create_all(self._engine)
             logger.info("所有数据库表创建/验证完成")
         except Exception as e:

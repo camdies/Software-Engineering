@@ -3,7 +3,7 @@ driver = mssql
 host = localhost
 port = 1433
 user = sa
-password = Cairenbin2005
+password = YOUR_DATABASE_PASSWORD
 database = CourseManagementDB
 pool_size = 10
 
@@ -19,4 +19,3 @@ max_login_attempts = 5
 is_open = true
 open_time = 2026-09-01 08:00:00
 close_time = 2026-09-07 23:59:59
-
