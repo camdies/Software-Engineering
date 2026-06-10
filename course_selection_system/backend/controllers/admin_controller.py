@@ -59,7 +59,7 @@ class AdminController:
 
                 total = query.count()
                 offset = (page - 1) * page_size
-                students = query.offset(offset).limit(page_size).all()
+                students = query.order_by(Student.student_id).offset(offset).limit(page_size).all()
 
                 return {
                     "total": total,
@@ -201,7 +201,7 @@ class AdminController:
                         f"%{college}%"))
                 total = query.count()
                 offset = (page - 1) * page_size
-                teachers = query.offset(offset).limit(page_size).all()
+                teachers = query.order_by(Teacher.teacher_id).offset(offset).limit(page_size).all()
                 return {
                     "total": total,
                     "page": page,
@@ -313,7 +313,7 @@ class AdminController:
                         f"%{course_name}%"))
                 total = query.count()
                 offset = (page - 1) * page_size
-                courses = query.offset(offset).limit(page_size).all()
+                courses = query.order_by(Course.course_id).offset(offset).limit(page_size).all()
                 return {
                     "total": total,
                     "page": page,
@@ -412,7 +412,7 @@ class AdminController:
                         OperationLog.log_type == log_type)
                 total = query.count()
                 offset = (page - 1) * page_size
-                logs = query.offset(offset).limit(page_size).all()
+                logs = query.order_by(OperationLog.log_id).offset(offset).limit(page_size).all()
                 return {
                     "total": total,
                     "page": page,
