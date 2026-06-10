@@ -1,0 +1,51 @@
+body { margin: 0; padding: 0; font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; }
+
+.el-menu { border-right: none !important; }
+.el-menu--collapse { width: 64px; }
+
+.el-table { margin-top: 12px; }
+.el-pagination { margin-top: 16px; justify-content: flex-end; }
+
+.page-card {
+  background: #fff;
+  border-radius: 4px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.page-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.page-toolbar .search-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: #fff;
+  border-radius: 4px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.stat-card .stat-value { font-size: 28px; font-weight: bold; color: #409eff; }
+.stat-card .stat-label { font-size: 13px; color: #999; margin-top: 4px; }
+.stat-card.danger .stat-value { color: #f56c6c; }
+.stat-card.warning .stat-value { color: #e6a23c; }
+.stat-card.success .stat-value { color: #67c23a; }
