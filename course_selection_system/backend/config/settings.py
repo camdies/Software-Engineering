@@ -77,12 +77,15 @@ class Settings:
             )
 
         # 默认 SQL Server — 优先使用 pyodbc + ODBC Driver 18
+        # AutoTranslate=No 禁止 pyodbc 将 UCS-2 经 ANSI 代码页转换，
+        # 避免非中文系统上 N(VAR)CHAR 中文字段被损坏。
         return (
             f"mssql+pyodbc://{db['user']}:{db['password']}"
             f"@{db['host']}:{db['port']}/{db['database']}"
             "?driver=ODBC+Driver+18+for+SQL+Server"
             "&TrustServerCertificate=yes"
             "&Encrypt=yes"
+            "&AutoTranslate=no"
         )
 
     @property

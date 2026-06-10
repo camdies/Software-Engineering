@@ -11,7 +11,15 @@ from frontend_pyside6.main_window import MainWindow
 
 def main():
     app = QApplication(sys.argv)
+<<<<<<< Updated upstream
     app.setFont(QFont("Microsoft YaHei", 9))
+=======
+    app.setFont(QFont("Microsoft YaHei", 10))
+    # 各处 STYLE 只设 font-size 不设 font-family 时
+    # Qt 会把字体重置为系统默认，导致中文渲染失败。
+    # 全局规则确保所有 widget 坚守 Microsoft YaHei。
+    app.setStyleSheet("* { font-family: 'Microsoft YaHei'; }")
+>>>>>>> Stashed changes
     try:
         DatabaseManager.get_instance().create_all_tables()
     except Exception as e:
