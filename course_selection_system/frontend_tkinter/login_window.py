@@ -19,80 +19,63 @@ COLOR_TEXT = "#212121"
 COLOR_SUBTEXT = "#757575"
 
 
-class LoginWindow(tk.Toplevel):
+class LoginWindow:
     """Login window for user authentication.
 
-    Centered 420x380 window with user_id/password fields,
-    login/exit buttons, and error feedback.
+    Embeds directly in the root window (not a Toplevel) to avoid
+    visibility issues on Windows when root is withdrawn.
     """
 
     def __init__(self, master, on_success=None):
-        """Initialise the login window.
-
-        Args:
-            master: Parent tkinter widget (usually the root Tk).
-            on_success (callable): Callback(user_id, role) on successful login.
-        """
-        super().__init__(master)
-
-        self.title("学生选课及成绩管理系统 - 登录")
-        self.configure(bg=COLOR_BG)
-        self.resizable(False, False)
+        self.master = master
         self.on_success_callback = on_success
         self.auth_controller = AuthController()
         self.error_label = None
 
-        # Window size and centering
+        master.title("学生选课及成绩管理系统 - 登录")
+        master.configure(bg=COLOR_BG)
+        master.resizable(False, False)
+
         self._win_width = 420
         self._win_height = 380
         self._center_window()
 
-        # Make modal to parent
-        self.transient(master)
-        self.grab_set()
-
-        # Build UI
         self._build_ui()
 
-        # Bind Enter key to login
-        self.bind("<Return>", lambda _e: self._do_login())
-        # Handle window close (Exit)
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        master.bind("<Return>", lambda _e: self._do_login())
+        master.protocol("WM_DELETE_WINDOW", self._on_close)
 
-    # ------------------------------------------------------------------
-    # Layout helpers
-    # ------------------------------------------------------------------
+    def destroy(self):
+        """Clean up — called by app before recreating the login view."""
+        self.master.unbind("<Return>")
 
     def _center_window(self):
-        """Centre the window on the screen."""
-        screen_w = self.winfo_screenwidth()
-        screen_h = self.winfo_screenheight()
+        screen_w = self.master.winfo_screenwidth()
+        screen_h = self.master.winfo_screenheight()
         x = (screen_w - self._win_width) // 2
         y = (screen_h - self._win_height) // 2
-        self.geometry(f"{self._win_width}x{self._win_height}+{x}+{y}")
+        self.master.geometry(f"{self._win_width}x{self._win_height}+{x}+{y}")
 
     def _build_ui(self):
-        """Construct the login form."""
-        # Header
+        master = self.master
+
         header = tk.Label(
-            self, text="学生选课及成绩管理系统",
+            master, text="学生选课及成绩管理系统",
             font=("微软雅黑", 16, "bold"),
             fg=COLOR_PRIMARY, bg=COLOR_BG,
         )
         header.pack(pady=(30, 5))
 
         sub_header = tk.Label(
-            self, text="请登录您的账号",
+            master, text="请登录您的账号",
             font=("微软雅黑", 10),
             fg=COLOR_SUBTEXT, bg=COLOR_BG,
         )
         sub_header.pack(pady=(0, 25))
 
-        # Form frame
-        form = tk.Frame(self, bg=COLOR_BG)
+        form = tk.Frame(master, bg=COLOR_BG)
         form.pack(padx=50, fill=tk.X)
 
-        # User ID
         tk.Label(
             form, text="用户ID", font=("微软雅黑", 11),
             fg=COLOR_TEXT, bg=COLOR_BG,
@@ -105,7 +88,6 @@ class LoginWindow(tk.Toplevel):
         self.entry_user_id.grid(row=1, column=0, ipady=4, pady=(0, 12))
         self.entry_user_id.focus_set()
 
-        # Password
         tk.Label(
             form, text="密码", font=("微软雅黑", 11),
             fg=COLOR_TEXT, bg=COLOR_BG,
@@ -117,14 +99,12 @@ class LoginWindow(tk.Toplevel):
         )
         self.entry_password.grid(row=3, column=0, ipady=4, pady=(0, 12))
 
-        # Error message label (hidden by default)
         self.error_label = tk.Label(
             form, text="", font=("微软雅黑", 9),
             fg=COLOR_ERROR, bg=COLOR_BG, wraplength=300,
         )
         self.error_label.grid(row=4, column=0, pady=(0, 10))
 
-        # Buttons frame
         btn_frame = tk.Frame(form, bg=COLOR_BG)
         btn_frame.grid(row=5, column=0, pady=(5, 0))
 
@@ -148,12 +128,7 @@ class LoginWindow(tk.Toplevel):
         )
         self.btn_exit.pack(side=tk.LEFT)
 
-    # ------------------------------------------------------------------
-    # Actions
-    # ------------------------------------------------------------------
-
     def _do_login(self):
-        """Validate input and attempt login via AuthController."""
         user_id = self.entry_user_id.get().strip()
         password = self.entry_password.get()
 
@@ -164,9 +139,8 @@ class LoginWindow(tk.Toplevel):
             self._show_error("请输入密码")
             return
 
-        # Disable the login button to prevent double-submit
         self.btn_login.config(state=tk.DISABLED, text="登录中...")
-        self.update()
+        self.master.update()
 
         result = self.auth_controller.login(user_id, password)
 
@@ -174,7 +148,6 @@ class LoginWindow(tk.Toplevel):
 
         if result.get("success"):
             self._clear_error()
-            self.grab_release()
             if self.on_success_callback:
                 self.on_success_callback(result["user_id"], result["role"])
         else:
@@ -185,19 +158,12 @@ class LoginWindow(tk.Toplevel):
                 self._show_error(msg)
 
     def _show_error(self, message):
-        """Display an error message in red below the form fields."""
         if self.error_label:
             self.error_label.config(text=message)
 
     def _clear_error(self):
-        """Clear the error message label."""
         if self.error_label:
             self.error_label.config(text="")
 
     def _on_close(self):
-        """Handle window close / Exit button."""
-        self.grab_release()
-        self.destroy()
-        # If no callback has fired, the app should quit
-        if self.on_success_callback is None:
-            self.master.destroy()
+        self.master.destroy()
