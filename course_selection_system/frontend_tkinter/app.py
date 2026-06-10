@@ -19,13 +19,12 @@ from frontend_tkinter.student_window import StudentWindow
 class Application:
     """Main application controller.
 
-    Manages the tkinter root window, database initialisation,
-    and transition between login and role-specific windows.
+    Uses the root window directly — no withdraw() — to avoid
+    Toplevel visibility issues on Windows tkinter 8.6.
     """
 
     def __init__(self):
         self.root = tk.Tk()
-        self.root.withdraw()  # Hide until login is ready
         self.current_window = None
         self.user_id = None
         self.role = None
@@ -47,8 +46,14 @@ class Application:
         self.show_login()
         self.root.mainloop()
 
+    def _clear_root(self):
+        """Destroy all child widgets of root, resetting it for the next view."""
+        for w in self.root.winfo_children():
+            w.destroy()
+
     def show_login(self):
-        """Display the login window."""
+        """Display the login form directly in the root window."""
+        self._clear_root()
         if self.current_window is not None:
             self.current_window.destroy()
             self.current_window = None
@@ -67,30 +72,33 @@ class Application:
         self.role = role
         self.login_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Destroy the login window
-        if self.current_window is not None:
-            self.current_window.destroy()
-            self.current_window = None
+        self._clear_root()
+        self.root.title("学生选课及成绩管理系统")  # Reset title
 
-        # Open the role-specific window
+        # Open the role-specific window (each is a Toplevel)
         if role == "admin":
-            self.current_window = AdminWindow(
+            win = AdminWindow(
                 self.root, user_id=self.user_id, login_time=self.login_time,
                 on_logout=self.on_logout,
             )
         elif role == "teacher":
-            self.current_window = TeacherWindow(
+            win = TeacherWindow(
                 self.root, user_id=self.user_id, login_time=self.login_time,
                 on_logout=self.on_logout,
             )
         elif role == "student":
-            self.current_window = StudentWindow(
+            win = StudentWindow(
                 self.root, user_id=self.user_id, login_time=self.login_time,
                 on_logout=self.on_logout,
             )
         else:
             messagebox.showerror("错误", f"未知的角色类型: {role}")
             self.show_login()
+            return
+
+        # Hide root AFTER Toplevel is created so WM tracks it properly
+        self.root.withdraw()
+        self.current_window = win
 
     def on_logout(self):
         """Callback when the user logs out from a role window.
@@ -110,6 +118,7 @@ class Application:
             self.current_window.destroy()
             self.current_window = None
 
+        self.root.deiconify()
         self.show_login()
 
 
