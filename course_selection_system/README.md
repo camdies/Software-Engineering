@@ -6,15 +6,17 @@
 
 | 层级 | 技术 |
 |------|------|
-| 应用层 | Python / PySide6 / Tkinter |
+| 前端 | Vue.js 3 + Element Plus + Vite |
+| 后端 API | Flask + JWT |
 | 数据访问 | SQLAlchemy / pyodbc / pymssql |
-| 数据库 | SQL Server |
+| 数据库 | SQL Server / MySQL |
 
 ---
 
 ## 环境要求
 
 - Python 3.11+
+- Node.js 18+ (仅前端开发需要)
 - pip
 - SQL Server（配置见 [SQL_SERVER_SETUP_GUIDE.md](./SQL_SERVER_SETUP_GUIDE.md)）
 
@@ -36,44 +38,35 @@ cd Software-Engineering\course_selection_system
 ### 3. 一键安装并启动
 
 ```powershell
-.\start.ps1
+# 安装 Python 依赖
+pip install -r requirements.txt
+pip install Flask flask-cors PyJWT marshmallow
+
+# 启动 Web 服务
+python run.py
 ```
 
-> 若提示执行策略限制，先运行一次：
-> ```powershell
-> Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-> ```
+浏览器访问 `http://localhost:5000`
 
-### 4. 手动启动（可选）
+### 4. 前端开发（可选）
 
 ```powershell
-# 安装依赖
-pip install -r requirements.txt
-
-# 启动 PySide6 界面
-python run_pyside6.py
-
-# 或启动 Tkinter 界面
-python run_tkinter.py
+cd frontend
+npm install
+npm run dev       # 启动 Vite dev server (localhost:5173)
 ```
+
+前端开发时 Vite 自动将 `/api` 请求代理到 Flask `localhost:5000`。
 
 ---
 
-## 前端界面
+## 默认账号
 
-本项目提供两种桌面前端，**任选其一**运行即可：
-
-### PySide6（推荐）
-
-```powershell
-python run_pyside6.py
-```
-
-### Tkinter
-
-```powershell
-python run_tkinter.py
-```
+| 角色 | 账号 | 密码 |
+|------|------|------|
+| 管理员 | admin | 123456 |
+| 教师 | T001 | 123456 |
+| 学生 | S001 | 123456 |
 
 ---
 
@@ -81,31 +74,37 @@ python run_tkinter.py
 
 ```
 course_selection_system/
-├── backend/              # Django 后端
-├── frontend_pyside6/     # PySide6 桌面前端
-├── frontend_tkinter/     # Tkinter 桌面前端
-├── docs/                 # 项目文档
+├── backend/              # 后端
+│   ├── api/              # Flask REST API (新增)
+│   ├── controllers/      # 业务逻辑
+│   ├── models/           # SQLAlchemy ORM
+│   ├── config/           # 配置
+│   └── utils/            # 工具
+├── frontend/             # Vue.js 前端 (新增)
+│   └── src/
+│       ├── views/        # 页面组件
+│       ├── router/       # Vue Router
+│       ├── stores/       # Pinia 状态
+│       └── components/   # 通用组件
 ├── tests/                # 测试用例
 ├── requirements.txt      # Python 依赖
-├── run_pyside6.py        # PySide6 启动入口
-├── run_tkinter.py        # Tkinter 启动入口
-├── start.ps1             # 一键启动脚本
+├── run.py                # Web 启动入口
 └── SQL_SERVER_SETUP_GUIDE.md  # 数据库配置指南
 ```
 
----
-
 ## 常见问题
 
-**Q: `requirements.txt` 报编码错误？**
+**Q: 启动报端口占用？**
 
-```powershell
-git checkout HEAD -- requirements.txt
-```
+修改 `run.py` 中的 `port=5000` 为其他端口。
 
 **Q: SQL Server 连接失败？**
 
-请检查 `backend` 目录下的数据库配置文件，确认连接字符串与本地 SQL Server 实例名一致。
+请检查 `backend/config/config.ini` 中的数据库连接信息。
+
+**Q: 前端页面空白？**
+
+确认已执行 `cd frontend && npm run build` 构建前端。
 
 ---
 
