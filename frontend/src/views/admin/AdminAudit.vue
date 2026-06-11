@@ -7,13 +7,13 @@
         <el-table :data="pwdList" stripe v-loading="pwdLoading" empty-text="暂无待审核申请">
           <el-table-column prop="request_id" label="ID" width="60" />
           <el-table-column prop="user_id" label="账号" width="120" />
-          <el-table-column prop="reason" label="原因" min-width="150" />
+          <el-table-column prop="reason" label="原因" min-width="180" />
           <el-table-column prop="request_time" label="申请时间" width="170">
             <template #default="{ row }">{{ row.request_time?.slice(0, 19) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="200" fixed="right">
+          <el-table-column label="操作" width="240" fixed="right">
             <template #default="{ row }">
-              <el-input v-model="row._comment" size="small" placeholder="意见" style="width:80px" />
+              <el-input v-model="row._comment" size="small" placeholder="审核意见" style="width:100px" />
               <el-button size="small" type="success" @click="handlePwd(row, 'approve')">通过</el-button>
               <el-button size="small" type="danger" @click="handlePwd(row, 'reject')">驳回</el-button>
             </template>
@@ -27,11 +27,19 @@
           <el-table-column prop="grade_id" label="ID" width="60" />
           <el-table-column prop="student_id" label="学号" width="120" />
           <el-table-column prop="course_name" label="课程" width="140" />
-          <el-table-column label="当前成绩" width="80"><template #default="{ row }"><el-tag>{{ row.score }}</el-tag></template></el-table-column>
-          <el-table-column prop="modify_reason" label="修改原因" min-width="150" />
-          <el-table-column label="操作" width="200" fixed="right">
+          <el-table-column label="当前成绩" width="80">
+            <template #default="{ row }"><el-tag>{{ row.score }}</el-tag></template>
+          </el-table-column>
+          <el-table-column label="申请改为" width="80">
             <template #default="{ row }">
-              <el-input v-model="row._comment" size="small" placeholder="意见" style="width:80px" />
+              <el-tag v-if="row.new_score" type="warning">{{ row.new_score }}</el-tag>
+              <span v-else>--</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="modify_reason" label="修改原因" min-width="150" />
+          <el-table-column label="操作" width="240" fixed="right">
+            <template #default="{ row }">
+              <el-input v-model="row._comment" size="small" placeholder="审核意见" style="width:100px" />
               <el-button size="small" type="success" @click="handleGrade(row, 'approve')">通过</el-button>
               <el-button size="small" type="danger" @click="handleGrade(row, 'reject')">驳回</el-button>
             </template>
@@ -40,19 +48,20 @@
       </el-tab-pane>
 
       <!-- 授课计划审核 -->
-      <el-tab-pane label="授课计划" name="plan">
+      <el-tab-pane label="课程审核" name="plan">
         <el-table :data="planList" stripe v-loading="planLoading" empty-text="暂无待审核计划">
           <el-table-column prop="plan_id" label="ID" width="60" />
-          <el-table-column prop="course_id" label="课程" width="90" />
-          <el-table-column prop="course_name" label="课程名" width="120" />
+          <el-table-column prop="course_id" label="课程代码" width="90" />
+          <el-table-column prop="course_name" label="课程名" width="130" />
           <el-table-column prop="teacher_id" label="教师" width="80" />
-          <el-table-column prop="teacher_name" label="教师名" width="80" />
-          <el-table-column prop="time_slot" label="时间" width="180" />
+          <el-table-column prop="teacher_name" label="教师名" width="90" />
+          <el-table-column prop="time_slot" label="时间安排" width="190" />
           <el-table-column prop="location" label="地点" width="100" />
           <el-table-column prop="capacity" label="容量" width="60" />
-          <el-table-column label="操作" width="200" fixed="right">
+          <el-table-column prop="apply_reason" label="申请理由" min-width="160" show-overflow-tooltip />
+          <el-table-column label="操作" width="240" fixed="right">
             <template #default="{ row }">
-              <el-input v-model="row._comment" size="small" placeholder="意见" style="width:80px" />
+              <el-input v-model="row._comment" size="small" placeholder="审核意见" style="width:100px" />
               <el-button size="small" type="success" @click="handlePlan(row, 'approve')">通过</el-button>
               <el-button size="small" type="danger" @click="handlePlan(row, 'reject')">驳回</el-button>
             </template>
@@ -65,7 +74,7 @@
     <div style="margin-top:16px;display:flex;gap:16px">
       <el-tag type="danger">密码重置: {{ badge.pwd }}</el-tag>
       <el-tag type="warning">成绩修改: {{ badge.grade }}</el-tag>
-      <el-tag type="info">授课计划: {{ badge.plan }}</el-tag>
+      <el-tag type="info">课程审核: {{ badge.plan }}</el-tag>
     </div>
   </div>
 </template>
@@ -123,19 +132,19 @@ function onTabChange() { fetchBadge() }
 
 async function handlePwd(row, action) {
   await request.post(`/audit/password-resets/${row.request_id}`, { action, comment: row._comment || '' })
-  ElMessage.success(action === 'approve' ? '已通过' : '已驳回')
+  ElMessage.success(action === 'approve' ? '密码重置已通过' : '已驳回')
   fetchPwd(); fetchBadge()
 }
 
 async function handleGrade(row, action) {
   await request.post(`/grade/audit/${row.grade_id}`, { action, comment: row._comment || '' })
-  ElMessage.success(action === 'approve' ? '已通过' : '已驳回')
+  ElMessage.success(action === 'approve' ? '成绩修改已通过' : '已驳回')
   fetchGrade(); fetchBadge()
 }
 
 async function handlePlan(row, action) {
   await request.post(`/audit/course-plans/${row.plan_id}`, { action, comment: row._comment || '' })
-  ElMessage.success(action === 'approve' ? '已通过' : '已驳回')
+  ElMessage.success(action === 'approve' ? '授课计划已通过' : '已驳回')
   fetchPlan(); fetchBadge()
 }
 </script>

@@ -46,7 +46,7 @@ class PasswordResetRequest(Base):
         comment="申请的新密码哈希（NULL=重置为默认密码）",
     )
     reason = Column(
-        String(200),
+        String(500),
         comment="申请原因",
     )
     status = Column(

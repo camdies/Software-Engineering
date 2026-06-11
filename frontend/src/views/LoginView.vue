@@ -20,14 +20,17 @@
     </div>
 
     <!-- 忘记密码弹窗 -->
-    <el-dialog v-model="showForgot" title="找回密码" width="420px">
-      <p style="color:#909399;margin:0 0 12px">输入账号提交密码重置申请，管理员审核后将重置为默认密码 123456。</p>
+    <el-dialog v-model="showForgot" title="找回密码" width="460px">
+      <p style="color:#909399;margin:0 0 16px;font-size:13px;line-height:1.8">
+        输入您的账号提交密码重置申请，管理员审核通过后密码将重置为默认密码 <strong>123456</strong>。
+        审核需要一定时间，请耐心等待。
+      </p>
       <el-form ref="forgotFormRef" :model="forgotForm" :rules="forgotRules">
         <el-form-item prop="user_id">
-          <el-input v-model="forgotForm.user_id" placeholder="请输入账号" />
+          <el-input v-model="forgotForm.user_id" placeholder="请输入您的账号（学号/工号）" size="large" />
         </el-form-item>
         <el-form-item prop="reason">
-          <el-input v-model="forgotForm.reason" type="textarea" :rows="2" placeholder="申请原因（选填）" />
+          <el-input v-model="forgotForm.reason" type="textarea" :rows="3" placeholder="请简要说明申请重置密码的原因，以便管理员审核" />
         </el-form-item>
       </el-form>
       <template #footer>

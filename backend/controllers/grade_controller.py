@@ -308,7 +308,8 @@ class GradeController:
 
                 # 更新为待审核状态，记录新成绩和原因
                 grade.status = "待审核"
-                grade.modify_reason = f"申请修改为{new_score}: {reason.strip()}"
+                grade.new_score = int(new_score)
+                grade.modify_reason = reason.strip()
 
                 self._write_log(
                     session, teacher_id, "成绩",
@@ -360,10 +361,7 @@ class GradeController:
                             "message": f"当前状态为'{grade.status}'，无需审核"}
 
                 if action == "approve":
-                    # 从 modify_reason 中提取新成绩值
-                    new_score = self._extract_new_score(
-                        grade.modify_reason
-                    )
+                    new_score = grade.new_score
                     if new_score is None:
                         return {"success": False,
                                 "message": "无法获取修改后的成绩值"}
@@ -375,7 +373,7 @@ class GradeController:
                     if comment:
                         grade.modify_reason = (
                             (grade.modify_reason or "")
-                            + f" [审核通过: {comment}]"
+                            + f" [审核意见: {comment}]"
                         )
                     operation_desc = (
                         f"审核通过: grade_id={grade_id}, "

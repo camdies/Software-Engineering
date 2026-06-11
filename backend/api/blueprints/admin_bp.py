@@ -62,7 +62,13 @@ def create_student():
     if not sid or not name:
         return error_response("学号和姓名不能为空")
     result = AdminController().create_student(
-        sid, name, data.get("major"), data.get("class_name"), data.get("contact")
+        sid, name,
+        major=data.get("major"),
+        class_name=data.get("class_name"),
+        contact=data.get("contact"),
+        email=data.get("email"),
+        grade=data.get("grade"),
+        password=data.get("password"),
     )
     if result.get("success"):
         return success_response(message=result["message"])
@@ -115,7 +121,12 @@ def create_teacher():
     if not tid or not name:
         return error_response("工号和姓名不能为空")
     result = AdminController().create_teacher(
-        tid, name, data.get("college"), data.get("contact")
+        tid, name,
+        college=data.get("college"),
+        title=data.get("title"),
+        contact=data.get("contact"),
+        email=data.get("email"),
+        password=data.get("password"),
     )
     if result.get("success"):
         return success_response(message=result["message"])
@@ -167,7 +178,17 @@ def create_course():
     if not cid or not name:
         return error_response("课程代码和课程名称不能为空")
     result = AdminController().create_course(
-        cid, name, data.get("credit"), data.get("hours"), data.get("exam_type")
+        cid, name,
+        credit=data.get("credit"),
+        hours=data.get("hours"),
+        exam_type=data.get("exam_type"),
+        department=data.get("department"),
+        course_type=data.get("course_type"),
+        target_major=data.get("target_major"),
+        description=data.get("description"),
+        textbook=data.get("textbook"),
+        syllabus=data.get("syllabus"),
+        instructor_intro=data.get("instructor_intro"),
     )
     if result.get("success"):
         return success_response(message=result["message"])

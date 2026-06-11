@@ -34,16 +34,24 @@ class TeacherController:
             semester: 学期过滤条件。
 
         Returns:
-            list: 开课计划字典列表。
+            list: 开课计划字典列表（含课程名称）。
         """
         try:
+            from backend.models.course import Course
+
             with self._db.get_session() as session:
-                query = session.query(CoursePlan).filter_by(
-                    teacher_id=teacher_id)
+                query = (
+                    session.query(CoursePlan, Course)
+                    .join(Course, CoursePlan.course_id == Course.course_id)
+                    .filter(CoursePlan.teacher_id == teacher_id)
+                )
                 if semester:
                     query = query.filter(CoursePlan.semester == semester)
-                plans = query.all()
-                return [p.to_dict() for p in plans]
+                results = query.order_by(CoursePlan.created_at.desc()).all()
+                return [
+                    {**p.to_dict(), "course_name": c.course_name}
+                    for p, c in results
+                ]
         except Exception as e:
             logger.error(f"查询教师授课计划异常: {e}", exc_info=True)
             return []

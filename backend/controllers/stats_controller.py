@@ -246,22 +246,10 @@ class StatsController:
 
     def export_stats_to_excel(self, stats_data: dict,
                               file_path: str) -> bool:
-        """将统计数据导出为Excel报表。
-
-        生成包含表头、数据行、汇总行的Excel文件，
-        应用基本样式（表头加粗、数据行交替色）。
-
-        Args:
-            stats_data: 统计数据字典（由其他stats方法返回）。
-            file_path: 导出文件路径。
-
-        Returns:
-            bool: 导出成功返回True，失败返回False。
-        """
+        """将统计数据导出为Excel报表。"""
         try:
             from backend.utils.export_util import export_to_excel
 
-            # 根据数据格式构造Excel
             if "rank_list" in stats_data:
                 headers = ["排名", "学号", "姓名", "成绩"]
                 rows = [[r["rank"], r["student_id"], r["name"],
@@ -289,6 +277,12 @@ class StatsController:
                 }
                 return export_to_excel(headers, rows, file_path,
                                        sheet_name="学业统计", summary_row=summary)
+            elif "schedule" in stats_data:
+                # 课表导出
+                headers = ["节次", "时间", "周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+                rows = stats_data["schedule"]
+                return export_to_excel(headers, rows, file_path,
+                                       sheet_name="个人课表")
             else:
                 logger.warning("stats_data格式不支持Excel导出")
                 return False
@@ -296,3 +290,44 @@ class StatsController:
         except Exception as e:
             logger.error(f"统计导出Excel异常: {e}", exc_info=True)
             return False
+
+    def get_schedule_data(self, student_id: str) -> dict:
+        """获取学生课表数据（用于导出）。
+
+        Args:
+            student_id: 学生学号。
+
+        Returns:
+            dict: 包含schedule二维数组的字典。
+        """
+        try:
+            from backend.models.student_controller import StudentController
+            sc = StudentController()
+            my_courses = sc.get_my_courses(student_id)
+
+            weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+            period_times = [
+                "08:30-09:10", "09:20-10:00", "10:20-11:00", "11:10-11:50",
+                "14:30-15:10", "15:20-16:00", "16:10-16:50", "17:00-17:40",
+                "19:00-19:40", "19:50-20:30", "20:40-21:20",
+            ]
+
+            schedule = []
+            for p in range(1, 12):
+                row = [f"第{p}节", period_times[p - 1]]
+                for d in range(1, 8):
+                    cell = ""
+                    for c in my_courses:
+                        if (c["weekday"] == d
+                            and c["period_start"] <= p
+                            and c["period_start"] + c["period_count"] - 1 >= p):
+                            cell = c.get("course_name", "")
+                            break
+                    row.append(cell)
+                schedule.append(row)
+
+            return {"schedule": schedule}
+
+        except Exception as e:
+            logger.error(f"获取课表数据异常: {e}", exc_info=True)
+            return {"schedule": []}
