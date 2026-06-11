@@ -37,9 +37,9 @@ class OperationLog(Base):
         comment="操作用户ID",
     )
     log_type = Column(
-        SAEnum("登录", "选课", "成绩", "系统"),
+        SAEnum("登录", "选课", "成绩", "审核", "系统"),
         nullable=False,
-        comment="操作类型: 登录/选课/成绩/系统",
+        comment="操作类型: 登录/选课/成绩/审核/系统",
     )
     operation = Column(
         String(200),

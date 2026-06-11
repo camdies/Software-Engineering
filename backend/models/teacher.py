@@ -31,9 +31,17 @@ class Teacher(Base):
         nullable=False,
         comment="教师姓名",
     )
+    title = Column(
+        String(50),
+        comment="职称（教授/副教授/讲师/助教）",
+    )
     college = Column(
         String(100),
         comment="所属学院",
+    )
+    email = Column(
+        String(100),
+        comment="电子邮箱",
     )
     contact = Column(
         String(20),
@@ -63,7 +71,9 @@ class Teacher(Base):
         return {
             "teacher_id": self.teacher_id,
             "name": self.name,
+            "title": self.title,
             "college": self.college,
+            "email": self.email,
             "contact": self.contact,
             "created_at": (
                 self.created_at.isoformat() if self.created_at else None
