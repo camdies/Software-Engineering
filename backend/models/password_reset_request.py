@@ -72,7 +72,7 @@ class PasswordResetRequest(Base):
         comment="管理员处理意见",
     )
 
-    user = relationship("UserAccount", back_populates="password_reset_requests")
+    user = relationship("UserAccount")
 
     def __repr__(self):
         return (
