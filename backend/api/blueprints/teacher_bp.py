@@ -110,6 +110,7 @@ def submit_course_plan():
             location=data.get("location", ""),
             capacity=data.get("capacity", 30),
             prerequisite=data.get("prerequisite", ""),
+            apply_reason=data.get("apply_reason", ""),
             status="待审核",
             created_at=datetime.now(),
         )
@@ -131,7 +132,7 @@ def update_course_plan(plan_id):
         if plan.status != "待审核":
             return error_response("仅可修改待审核状态的申请")
 
-        for key in ("weekday", "period_start", "period_count", "start_week", "end_week", "location", "capacity", "prerequisite"):
+        for key in ("weekday", "period_start", "period_count", "start_week", "end_week", "location", "capacity", "prerequisite", "apply_reason"):
             if key in data:
                 setattr(plan, key, data[key])
 

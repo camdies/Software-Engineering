@@ -100,6 +100,10 @@ class CoursePlan(Base):
         String(200),
         comment="先修课程代码，多个以逗号分隔",
     )
+    apply_reason = Column(
+        String(500),
+        comment="教师申请理由",
+    )
     status = Column(
         SAEnum("待审核", "已通过", "已驳回", "已停课"),
         default="待审核",
@@ -169,6 +173,7 @@ class CoursePlan(Base):
             "capacity": self.capacity,
             "enrolled": self.enrolled,
             "prerequisite": self.prerequisite,
+            "apply_reason": self.apply_reason,
             "status": self.status,
             "audit_comment": self.audit_comment,
             "created_at": (

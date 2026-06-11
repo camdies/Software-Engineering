@@ -17,6 +17,12 @@ backup_dir = backup
 backup_retain_days = 30
 session_timeout = 3600
 max_login_attempts = 5
+# 学期默认总周数（可在数据库中通过 semester_config 表按学期配置）
+default_total_weeks = 20
+
+[web]
+jwt_secret =
+jwt_expiration_hours = 24
 
 [enrollment]
 is_open = false
