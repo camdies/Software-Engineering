@@ -66,7 +66,6 @@ class UserAccount(Base):
     # 关联关系
     student = relationship("Student", back_populates="account", uselist=False)
     teacher = relationship("Teacher", back_populates="account", uselist=False)
-    password_reset_requests = relationship("PasswordResetRequest", back_populates="user")
 
     def __repr__(self):
         return (
