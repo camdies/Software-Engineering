@@ -11,10 +11,11 @@
 
     <el-table :data="list" stripe v-loading="loading">
       <el-table-column prop="student_id" label="学号" width="130" />
-      <el-table-column prop="name" label="姓名" width="100" />
-      <el-table-column prop="major" label="专业" width="140" />
-      <el-table-column prop="class_name" label="班级" width="120" />
-      <el-table-column prop="contact" label="联系方式" min-width="140" />
+      <el-table-column prop="name" label="姓名" width="90" />
+      <el-table-column prop="grade" label="年级" width="70" />
+      <el-table-column prop="major" label="专业" width="120" />
+      <el-table-column prop="class_name" label="班级" width="100" />
+      <el-table-column prop="email" label="邮箱" min-width="160" />
       <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openDialog(row)">编辑</el-button>
@@ -26,15 +27,21 @@
     <el-pagination v-model:current-page="page" :total="total" :page-size="20" layout="total, prev, pager, next"
       @current-change="fetchData" />
 
-    <el-dialog v-model="dialogVisible" :title="editing ? '编辑学生' : '新增学生'" width="460px">
+    <el-dialog v-model="dialogVisible" :title="editing ? '编辑学生' : '新增学生'" width="520px">
       <el-form ref="formRef" :model="form" label-width="80px">
         <el-form-item label="学号" required>
           <el-input v-model="form.student_id" :disabled="!!editing" />
         </el-form-item>
         <el-form-item label="姓名" required><el-input v-model="form.name" /></el-form-item>
+        <el-form-item label="年级"><el-input v-model="form.grade" placeholder="如 2024" /></el-form-item>
         <el-form-item label="专业"><el-input v-model="form.major" /></el-form-item>
         <el-form-item label="班级"><el-input v-model="form.class_name" /></el-form-item>
+        <el-form-item label="邮箱"><el-input v-model="form.email" /></el-form-item>
         <el-form-item label="联系方式"><el-input v-model="form.contact" /></el-form-item>
+        <el-form-item v-if="!editing" label="默认密码">
+          <el-input v-model="form.setup_password" show-password placeholder="默认123456" />
+          <span style="font-size:11px;color:#909399">系统自动以此学号注册账号</span>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -53,7 +60,7 @@ const loading = ref(false), saving = ref(false), dialogVisible = ref(false), edi
 const page = ref(1), total = ref(0), list = ref([])
 const search = reactive({ student_id: '', name: '', class_name: '' })
 const formRef = ref(null)
-const form = reactive({ student_id: '', name: '', major: '', class_name: '', contact: '' })
+const form = reactive({ student_id: '', name: '', major: '', class_name: '', grade: '', email: '', contact: '', setup_password: '123456' })
 
 onMounted(fetchData)
 
@@ -69,9 +76,9 @@ async function fetchData() {
 function openDialog(row) {
   editing.value = row || null
   if (row) {
-    Object.assign(form, { student_id: row.student_id, name: row.name, major: row.major || '', class_name: row.class_name || '', contact: row.contact || '' })
+    Object.assign(form, { student_id: row.student_id, name: row.name, major: row.major || '', class_name: row.class_name || '', grade: row.grade || '', email: row.email || '', contact: row.contact || '', setup_password: '' })
   } else {
-    Object.assign(form, { student_id: '', name: '', major: '', class_name: '', contact: '' })
+    Object.assign(form, { student_id: '', name: '', major: '', class_name: '', grade: '', email: '', contact: '', setup_password: '123456' })
   }
   dialogVisible.value = true
 }
@@ -85,7 +92,7 @@ async function save() {
     } else {
       await request.post('/admin/students', form)
     }
-    ElMessage.success(editing.value ? '更新成功' : '创建成功')
+    ElMessage.success(editing.value ? '更新成功' : '学生创建成功，账号已自动注册')
     dialogVisible.value = false; fetchData()
   } finally { saving.value = false }
 }

@@ -67,14 +67,14 @@ class EnrollmentController:
 
                 # 获取开课计划信息
                 plan = session.query(CoursePlan).filter_by(
-                    plan_id=plan_id, status="开课"
+                    plan_id=plan_id, status="已通过"
                 ).first()
                 if plan is None:
                     self._write_log(session, student_id, "选课",
-                                    f"选课失败: 开课计划{plan_id}不存在或已停课",
+                                    f"选课失败: 开课计划{plan_id}不存在或未审核通过",
                                     "失败", "")
                     return {"success": False,
-                            "message": "课程不存在或已停课"}
+                            "message": "课程不存在或未开放选课"}
 
                 # --- 校验2: 重复选课校验 ---
                 existing = session.query(Enrollment).filter_by(
@@ -235,7 +235,8 @@ class EnrollmentController:
                              target_plan: CoursePlan) -> dict:
         """校验学生已选课程与目标课程是否存在时间冲突。
 
-        解析time_slot字段（格式：'周一1-2节'）并比对。
+        使用 weekday + period_start + period_count 做重叠判断。
+        同时检查 week 范围重叠（周数冲突）。
 
         Args:
             session: 数据库会话。
@@ -246,34 +247,35 @@ class EnrollmentController:
             dict: {'conflict': bool}
         """
         try:
-            target_slot = target_plan.time_slot
-            if not target_slot:
-                return {"conflict": False}
+            tw = target_plan.weekday
+            tps = target_plan.period_start
+            tpe = tps + target_plan.period_count - 1
+            tws = target_plan.start_week or 1
+            twe = target_plan.end_week or 20
 
-            # 查询学生已选所有课程的时间段
             enrolled_plans = (
-                session.query(CoursePlan.time_slot)
-                .join(Enrollment,
-                      Enrollment.plan_id == CoursePlan.plan_id)
+                session.query(CoursePlan)
+                .join(Enrollment, Enrollment.plan_id == CoursePlan.plan_id)
                 .filter(
                     Enrollment.student_id == student_id,
                     Enrollment.status == "已选",
+                    CoursePlan.status == "已通过",
                 )
                 .all()
             )
 
-            target_parsed = self._parse_time_slot(target_slot)
-            if target_parsed is None:
-                return {"conflict": False}
+            for ep in enrolled_plans:
+                ew = ep.weekday
+                eps = ep.period_start
+                epe = eps + ep.period_count - 1
+                ews = ep.start_week or 1
+                ewe = ep.end_week or 20
 
-            for (slot,) in enrolled_plans:
-                if not slot:
-                    continue
-                parsed = self._parse_time_slot(slot)
-                if parsed is None:
-                    continue
-                if target_parsed == parsed:
-                    return {"conflict": True}
+                # 同一天且节次重叠
+                if ew == tw and eps <= tpe and epe >= tps:
+                    # 周数也有重叠
+                    if ews <= twe and ewe >= tws:
+                        return {"conflict": True}
 
             return {"conflict": False}
         except Exception as e:

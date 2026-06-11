@@ -39,6 +39,14 @@ class Student(Base):
         String(50),
         comment="所在班级",
     )
+    grade = Column(
+        String(4),
+        comment="年级（如2024）",
+    )
+    email = Column(
+        String(100),
+        comment="电子邮箱",
+    )
     contact = Column(
         String(20),
         comment="联系方式",
@@ -70,6 +78,8 @@ class Student(Base):
             "name": self.name,
             "major": self.major,
             "class_name": self.class_name,
+            "grade": self.grade,
+            "email": self.email,
             "contact": self.contact,
             "created_at": (
                 self.created_at.isoformat() if self.created_at else None

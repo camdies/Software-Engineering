@@ -20,6 +20,8 @@ from backend.api.blueprints.teacher_bp import teacher_bp
 from backend.api.blueprints.enrollment_bp import enrollment_bp
 from backend.api.blueprints.grade_bp import grade_bp
 from backend.api.blueprints.stats_bp import stats_bp
+from backend.api.blueprints.audit_bp import audit_bp
+from backend.api.blueprints.password_reset_bp import password_reset_bp
 from backend.api.response import error_response
 
 
@@ -44,12 +46,14 @@ def create_app() -> Flask:
 
     # 注册 Blueprints
     app.register_blueprint(auth_bp)
+    app.register_blueprint(password_reset_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(student_bp)
     app.register_blueprint(teacher_bp)
     app.register_blueprint(enrollment_bp)
     app.register_blueprint(grade_bp)
     app.register_blueprint(stats_bp)
+    app.register_blueprint(audit_bp)
 
     # 全局错误处理
     @app.errorhandler(404)

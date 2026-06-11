@@ -38,7 +38,7 @@ class StudentController:
                     session.query(CoursePlan, Course)
                     .join(Course,
                           CoursePlan.course_id == Course.course_id)
-                    .filter(CoursePlan.status == "开课")
+                    .filter(CoursePlan.status == "已通过")
                 )
                 if semester:
                     query = query.filter(
@@ -51,12 +51,19 @@ class StudentController:
                         **course.to_dict(),
                         "plan_id": plan.plan_id,
                         "teacher_id": plan.teacher_id,
-                        "time_slot": plan.time_slot,
+                        "time_slot": plan.time_slot_display,
+                        "weekday": plan.weekday,
+                        "period_start": plan.period_start,
+                        "period_count": plan.period_count,
+                        "start_week": plan.start_week,
+                        "end_week": plan.end_week,
                         "location": plan.location,
                         "capacity": plan.capacity,
                         "enrolled": plan.enrolled or 0,
                         "available": (plan.capacity or 0) - (
                             plan.enrolled or 0),
+                        "semester": plan.semester,
+                        "prerequisite": plan.prerequisite,
                     })
                 return courses
         except Exception as e:
@@ -90,7 +97,14 @@ class StudentController:
                     {
                         **c.to_dict(),
                         "plan_id": cp.plan_id,
-                        "time_slot": cp.time_slot,
+                        "time_slot": cp.time_slot_display,
+                        "weekday": cp.weekday,
+                        "period_start": cp.period_start,
+                        "period_count": cp.period_count,
+                        "start_week": cp.start_week,
+                        "end_week": cp.end_week,
+                        "semester": cp.semester,
+                        "location": cp.location,
                         "enroll_time": e.enroll_time.isoformat()
                         if e.enroll_time else None,
                     }
