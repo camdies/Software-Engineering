@@ -13,15 +13,37 @@
         <el-form-item>
           <el-button type="primary" style="width:100%" :loading="loading" @click="submit">登 录</el-button>
         </el-form-item>
+        <el-form-item style="text-align:center;margin-bottom:0">
+          <el-button link type="primary" @click="showForgot = true">忘记密码</el-button>
+        </el-form-item>
       </el-form>
     </div>
+
+    <!-- 忘记密码弹窗 -->
+    <el-dialog v-model="showForgot" title="找回密码" width="420px">
+      <p style="color:#909399;margin:0 0 12px">输入账号提交密码重置申请，管理员审核后将重置为默认密码 123456。</p>
+      <el-form ref="forgotFormRef" :model="forgotForm" :rules="forgotRules">
+        <el-form-item prop="user_id">
+          <el-input v-model="forgotForm.user_id" placeholder="请输入账号" />
+        </el-form-item>
+        <el-form-item prop="reason">
+          <el-input v-model="forgotForm.reason" type="textarea" :rows="2" placeholder="申请原因（选填）" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showForgot = false">取消</el-button>
+        <el-button type="primary" :loading="forgotLoading" @click="submitForgot">提交申请</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import request from '@/utils/request'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -44,6 +66,27 @@ async function submit() {
     else router.push('/student/enroll')
   } catch (_) { /* interceptor handles */ }
   finally { loading.value = false }
+}
+
+// ── 忘记密码 ──
+const showForgot = ref(false)
+const forgotLoading = ref(false)
+const forgotFormRef = ref(null)
+const forgotForm = reactive({ user_id: '', reason: '' })
+const forgotRules = {
+  user_id: [{ required: true, message: '请输入账号', trigger: 'blur' }],
+}
+
+async function submitForgot() {
+  const valid = await forgotFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  forgotLoading.value = true
+  try {
+    await request.post('/auth/forgot-password', forgotForm)
+    ElMessage.success('密码重置申请已提交，请等待管理员审核')
+    showForgot.value = false
+  } catch (_) { /* interceptor handles */ }
+  finally { forgotLoading.value = false }
 }
 </script>
 
