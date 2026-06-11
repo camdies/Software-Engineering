@@ -25,14 +25,20 @@
     <el-pagination v-model:current-page="page" :total="total" :page-size="20" layout="total, prev, pager, next"
       @current-change="fetchData" />
 
-    <el-dialog v-model="dialogVisible" :title="editing ? '编辑教师' : '新增教师'" width="460px">
+    <el-dialog v-model="dialogVisible" :title="editing ? '编辑教师' : '新增教师'" width="520px">
       <el-form ref="formRef" :model="form" label-width="80px">
         <el-form-item label="工号" required>
           <el-input v-model="form.teacher_id" :disabled="!!editing" />
         </el-form-item>
         <el-form-item label="姓名" required><el-input v-model="form.name" /></el-form-item>
+        <el-form-item label="职称"><el-input v-model="form.title" placeholder="如 教授" /></el-form-item>
         <el-form-item label="学院"><el-input v-model="form.college" /></el-form-item>
+        <el-form-item label="邮箱"><el-input v-model="form.email" /></el-form-item>
         <el-form-item label="联系方式"><el-input v-model="form.contact" /></el-form-item>
+        <el-form-item v-if="!editing" label="默认密码">
+          <el-input v-model="form.password" show-password placeholder="留空则默认123456" />
+          <span style="font-size:11px;color:#909399">系统自动以此工号注册账号，密码默认123456</span>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -51,7 +57,7 @@ const loading = ref(false), saving = ref(false), dialogVisible = ref(false), edi
 const page = ref(1), total = ref(0), list = ref([])
 const search = reactive({ teacher_id: '', name: '', college: '' })
 const formRef = ref(null)
-const form = reactive({ teacher_id: '', name: '', college: '', contact: '' })
+const form = reactive({ teacher_id: '', name: '', title: '', college: '', email: '', contact: '', password: '' })
 
 onMounted(fetchData)
 
@@ -65,8 +71,8 @@ async function fetchData() {
 
 function openDialog(row) {
   editing.value = row || null
-  Object.assign(form, row ? { teacher_id: row.teacher_id, name: row.name, college: row.college || '', contact: row.contact || '' }
-    : { teacher_id: '', name: '', college: '', contact: '' })
+  Object.assign(form, row ? { ...row, password: '' }
+    : { teacher_id: '', name: '', title: '', college: '', email: '', contact: '', password: '' })
   dialogVisible.value = true
 }
 

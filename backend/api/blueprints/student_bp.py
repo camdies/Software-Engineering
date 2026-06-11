@@ -21,7 +21,19 @@ student_bp = Blueprint("student", __name__, url_prefix="/api/student")
 @require_role("student")
 def get_available_courses():
     semester = request.args.get("semester")
-    result = StudentController().get_available_courses(semester)
+    department = request.args.get("department")
+    credit_range = request.args.get("credit_range")
+    weekday = request.args.get("weekday")
+    exam_type = request.args.get("exam_type")
+    course_type = request.args.get("course_type")
+    result = StudentController().get_available_courses(
+        semester=semester,
+        department=department,
+        credit_range=credit_range,
+        weekday=weekday,
+        exam_type=exam_type,
+        course_type=course_type,
+    )
     return success_response({"items": result})
 
 

@@ -39,8 +39,8 @@
         <el-form-item label="邮箱"><el-input v-model="form.email" /></el-form-item>
         <el-form-item label="联系方式"><el-input v-model="form.contact" /></el-form-item>
         <el-form-item v-if="!editing" label="默认密码">
-          <el-input v-model="form.setup_password" show-password placeholder="默认123456" />
-          <span style="font-size:11px;color:#909399">系统自动以此学号注册账号</span>
+          <el-input v-model="form.password" show-password placeholder="留空则默认123456" />
+          <span style="font-size:11px;color:#909399">系统自动以此学号注册账号，密码默认123456</span>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -60,7 +60,7 @@ const loading = ref(false), saving = ref(false), dialogVisible = ref(false), edi
 const page = ref(1), total = ref(0), list = ref([])
 const search = reactive({ student_id: '', name: '', class_name: '' })
 const formRef = ref(null)
-const form = reactive({ student_id: '', name: '', major: '', class_name: '', grade: '', email: '', contact: '', setup_password: '123456' })
+const form = reactive({ student_id: '', name: '', major: '', class_name: '', grade: '', email: '', contact: '', password: '' })
 
 onMounted(fetchData)
 
@@ -76,9 +76,9 @@ async function fetchData() {
 function openDialog(row) {
   editing.value = row || null
   if (row) {
-    Object.assign(form, { student_id: row.student_id, name: row.name, major: row.major || '', class_name: row.class_name || '', grade: row.grade || '', email: row.email || '', contact: row.contact || '', setup_password: '' })
+    Object.assign(form, { student_id: row.student_id, name: row.name, major: row.major || '', class_name: row.class_name || '', grade: row.grade || '', email: row.email || '', contact: row.contact || '', password: '' })
   } else {
-    Object.assign(form, { student_id: '', name: '', major: '', class_name: '', grade: '', email: '', contact: '', setup_password: '123456' })
+    Object.assign(form, { student_id: '', name: '', major: '', class_name: '', grade: '', email: '', contact: '', password: '' })
   }
   dialogVisible.value = true
 }

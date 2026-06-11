@@ -272,6 +272,50 @@ class AuthController:
             logger.error(f"密码重置异常: {e}", exc_info=True)
             return {"success": False, "message": "系统异常，请稍后重试"}
 
+    def forgot_password(self, user_id: str, reason: str = "") -> dict:
+        """用户申请找回密码（提交重置申请）。
+
+        Args:
+            user_id: 账号。
+            reason: 申请原因。
+
+        Returns:
+            dict: {'success': bool, 'message': str}
+        """
+        try:
+            from backend.models.password_reset_request import PasswordResetRequest
+
+            with self._db.get_session() as session:
+                user = session.query(UserAccount).filter_by(
+                    user_id=user_id
+                ).first()
+                if user is None:
+                    return {"success": False, "message": "账号不存在"}
+
+                # 检查是否已有待审核的申请
+                existing = session.query(PasswordResetRequest).filter_by(
+                    user_id=user_id, status="待审核"
+                ).first()
+                if existing:
+                    return {"success": False,
+                            "message": "您已有待审核的密码重置申请，请等待管理员处理"}
+
+                req = PasswordResetRequest(
+                    user_id=user_id,
+                    reason=reason or "",
+                    status="待审核",
+                    request_time=datetime.now(),
+                )
+                session.add(req)
+                self._write_log(session, user_id, "系统",
+                                f"用户{user_id}提交密码重置申请", "成功", "")
+                logger.info(f"用户{user_id}提交了密码重置申请")
+                return {"success": True,
+                        "message": "密码重置申请已提交，请等待管理员审核"}
+        except Exception as e:
+            logger.error(f"密码重置申请异常: {e}", exc_info=True)
+            return {"success": False, "message": "系统异常，请稍后重试"}
+
     def _write_log(self, session, user_id: str, log_type: str,
                    operation: str, result: str, ip_address: str) -> None:
         """写入操作日志。

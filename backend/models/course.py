@@ -64,8 +64,17 @@ class Course(Base):
         String(2000),
         comment="教学大纲",
     )
+    course_type = Column(
+        String(20),
+        default="必修",
+        comment="课程类型: 必修/选修/公共必修/公共选修",
+    )
+    target_major = Column(
+        String(200),
+        comment="面向专业，多个以逗号分隔",
+    )
     instructor_intro = Column(
-        String(500),
+        String(2000),
         comment="教师简介",
     )
     created_at = Column(
@@ -96,6 +105,8 @@ class Course(Base):
             "hours": self.hours,
             "exam_type": self.exam_type,
             "department": self.department,
+            "course_type": self.course_type,
+            "target_major": self.target_major,
             "description": self.description,
             "textbook": self.textbook,
             "syllabus": self.syllabus,

@@ -23,34 +23,67 @@ class StudentController:
     def __init__(self):
         self._db = DatabaseManager.get_instance()
 
-    def get_available_courses(self, semester: str = None) -> list:
+    def get_available_courses(self, semester: str = None,
+                              department: str = None,
+                              credit_range: str = None,
+                              weekday: int = None,
+                              exam_type: str = None,
+                              course_type: str = None) -> list:
         """获取可选课程列表。
 
         Args:
             semester: 学期过滤条件。
+            department: 院系过滤条件。
+            credit_range: 学分范围（如"0-2","2-4","4-6"）。
+            weekday: 上课日过滤条件。
+            exam_type: 考核方式过滤条件。
+            course_type: 课程类型过滤条件。
 
         Returns:
             list: 课程信息字典列表（含教师姓名、余量等）。
         """
         try:
             with self._db.get_session() as session:
+                from backend.models.teacher import Teacher
+
                 query = (
-                    session.query(CoursePlan, Course)
+                    session.query(CoursePlan, Course, Teacher)
                     .join(Course,
                           CoursePlan.course_id == Course.course_id)
+                    .join(Teacher,
+                          CoursePlan.teacher_id == Teacher.teacher_id)
                     .filter(CoursePlan.status == "已通过")
                 )
                 if semester:
                     query = query.filter(
                         CoursePlan.semester == semester)
+                if department:
+                    query = query.filter(
+                        Course.department == department)
+                if credit_range:
+                    parts = credit_range.split("-")
+                    if len(parts) == 2:
+                        query = query.filter(
+                            Course.credit >= float(parts[0]),
+                            Course.credit <= float(parts[1]))
+                if weekday:
+                    query = query.filter(
+                        CoursePlan.weekday == int(weekday))
+                if exam_type:
+                    query = query.filter(
+                        Course.exam_type == exam_type)
+                if course_type:
+                    query = query.filter(
+                        Course.course_type == course_type)
 
                 results = query.all()
                 courses = []
-                for plan, course in results:
+                for plan, course, teacher in results:
                     courses.append({
                         **course.to_dict(),
                         "plan_id": plan.plan_id,
                         "teacher_id": plan.teacher_id,
+                        "teacher_name": teacher.name,
                         "time_slot": plan.time_slot_display,
                         "weekday": plan.weekday,
                         "period_start": plan.period_start,
@@ -64,6 +97,9 @@ class StudentController:
                             plan.enrolled or 0),
                         "semester": plan.semester,
                         "prerequisite": plan.prerequisite,
+                        "apply_reason": plan.apply_reason,
+                        "status": plan.status,
+                        "audit_comment": plan.audit_comment,
                     })
                 return courses
         except Exception as e:

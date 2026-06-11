@@ -62,6 +62,9 @@ class DatabaseManager:
         import backend.models.enrollment    # noqa: F401
         import backend.models.grade         # noqa: F401
         import backend.models.operation_log # noqa: F401
+        import backend.models.class_period  # noqa: F401
+        import backend.models.semester_config # noqa: F401
+        import backend.models.password_reset_request # noqa: F401
 
     def _init_engine(self):
         """从配置文件读取参数并创建 SQLAlchemy Engine。
