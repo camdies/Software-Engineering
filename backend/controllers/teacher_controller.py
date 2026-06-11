@@ -39,7 +39,7 @@ class TeacherController:
         try:
             with self._db.get_session() as session:
                 query = session.query(CoursePlan).filter_by(
-                    teacher_id=teacher_id, status="开课")
+                    teacher_id=teacher_id)
                 if semester:
                     query = query.filter(CoursePlan.semester == semester)
                 plans = query.all()

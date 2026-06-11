@@ -27,19 +27,9 @@
             <el-menu-item index="/admin/courses"><el-icon><Collection /></el-icon><span>课程信息</span></el-menu-item>
             <el-menu-item index="/admin/course-plans"><el-icon><Notebook /></el-icon><span>开课计划</span></el-menu-item>
           </el-sub-menu>
-          <el-sub-menu index="admin-enrollment">
-            <template #title><el-icon><Select /></el-icon><span>选课管理</span></template>
-            <el-menu-item index="/admin/enrollment-control"><el-icon><Setting /></el-icon><span>选课控制</span></el-menu-item>
-            <el-menu-item index="/admin/enrollment-stats"><el-icon><DataAnalysis /></el-icon><span>选课统计</span></el-menu-item>
-          </el-sub-menu>
-          <el-sub-menu index="admin-grades">
-            <template #title><el-icon><Document /></el-icon><span>成绩管理</span></template>
-            <el-menu-item index="/admin/grade-audit"><el-icon><Checked /></el-icon><span>成绩审核</span></el-menu-item>
-          </el-sub-menu>
-          <el-sub-menu index="admin-system">
-            <template #title><el-icon><Monitor /></el-icon><span>系统管理</span></template>
-            <el-menu-item index="/admin/logs"><el-icon><Tickets /></el-icon><span>操作日志</span></el-menu-item>
-          </el-sub-menu>
+          <el-menu-item index="/admin/audit"><el-icon><Checked /></el-icon><span>审核中心</span></el-menu-item>
+          <el-menu-item index="/admin/enrollment-stats"><el-icon><DataAnalysis /></el-icon><span>选课统计</span></el-menu-item>
+          <el-menu-item index="/admin/logs"><el-icon><Tickets /></el-icon><span>操作日志</span></el-menu-item>
         </template>
 
         <!-- Teacher menu -->
@@ -58,7 +48,7 @@
           <el-sub-menu index="student-enrollment">
             <template #title><el-icon><Select /></el-icon><span>选课管理</span></template>
             <el-menu-item index="/student/enroll"><el-icon><CirclePlus /></el-icon><span>选课</span></el-menu-item>
-            <el-menu-item index="/student/my-courses"><el-icon><List /></el-icon><span>我的课程</span></el-menu-item>
+            <el-menu-item index="/student/my-courses"><el-icon><List /></el-icon><span>个人课表</span></el-menu-item>
           </el-sub-menu>
           <el-menu-item index="/student/grades"><el-icon><Document /></el-icon><span>成绩查询</span></el-menu-item>
           <el-menu-item index="/student/stats"><el-icon><DataAnalysis /></el-icon><span>学业统计</span></el-menu-item>

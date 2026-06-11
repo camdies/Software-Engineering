@@ -1,8 +1,8 @@
-# Microsoft SQL Server 2025 + SSMS 2022 安装与配置指南
+# Microsoft SQL Server + SSMS 安装与配置指南 v2.0
 
-> **适用**: 学生选课及成绩管理系统（course_selection_system）
-> **数据库**: Microsoft SQL Server 2025 Developer Edition
-> **管理工具**: SQL Server Management Studio (SSMS) 2022
+> **适用**: 高校教务管理系统
+> **数据库**: Microsoft SQL Server (Developer Edition)
+> **管理工具**: SQL Server Management Studio (SSMS)
 
 ---
 
@@ -247,7 +247,37 @@ SELECT user_id, role FROM dbo.user_account;
 SELECT course_id, course_name, credit FROM dbo.course;
 ```
 
-应该看到 8 张表和 6 个测试用户。
+应该看到 9 张表和 7 个测试用户。
+
+### 数据库表说明（v2.0）
+
+| 表名 | 说明 |
+|------|------|
+| user_account | 用户账号（admin/teacher/student） |
+| student | 学生信息（含年级、邮箱） |
+| teacher | 教师信息（含职称、邮箱） |
+| course | 课程信息（含简介、教材、大纲） |
+| course_plan | 开课计划（教师申请制，工作日+节次+周范围） |
+| enrollment | 选课记录 |
+| grade | 成绩记录 |
+| operation_log | 操作日志 |
+| password_reset_request | 密码重置申请（用户申请→管理员审核） |
+
+### 上课时间（11节课）
+
+| 节次 | 时间 |
+|------|------|
+| 第1节 | 08:30-09:10 |
+| 第2节 | 09:20-10:00 |
+| 第3节 | 10:20-11:00 |
+| 第4节 | 11:10-11:50 |
+| 第5节 | 14:30-15:10 |
+| 第6节 | 15:20-16:00 |
+| 第7节 | 16:10-16:50 |
+| 第8节 | 17:00-17:40 |
+| 第9节 | 19:00-19:40 |
+| 第10节 | 19:50-20:30 |
+| 第11节 | 20:40-21:20 |
 
 ---
 

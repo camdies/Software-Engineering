@@ -48,6 +48,26 @@ class Course(Base):
         SAEnum("考试", "考查"),
         comment="考核方式: 考试/考查",
     )
+    department = Column(
+        String(100),
+        comment="开课院系",
+    )
+    description = Column(
+        String(2000),
+        comment="课程简介",
+    )
+    textbook = Column(
+        String(200),
+        comment="教材",
+    )
+    syllabus = Column(
+        String(2000),
+        comment="教学大纲",
+    )
+    instructor_intro = Column(
+        String(500),
+        comment="教师简介",
+    )
     created_at = Column(
         DateTime,
         default=datetime.now,
@@ -75,6 +95,11 @@ class Course(Base):
             "credit": float(self.credit) if self.credit else None,
             "hours": self.hours,
             "exam_type": self.exam_type,
+            "department": self.department,
+            "description": self.description,
+            "textbook": self.textbook,
+            "syllabus": self.syllabus,
+            "instructor_intro": self.instructor_intro,
             "created_at": (
                 self.created_at.isoformat() if self.created_at else None
             ),

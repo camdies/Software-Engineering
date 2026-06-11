@@ -1,8 +1,8 @@
 """
 models/course_plan.py - 开课计划模型
 
-映射 course_plan 表，存储每学期的开课记录，
-包括教师、时间、地点、容量、先修课等信息。
+映射 course_plan 表，存储每学期的开课记录。
+教师提交申请，管理员审核通过后学生方可选课。
 """
 
 from datetime import datetime
@@ -21,10 +21,11 @@ from backend.models.base import Base
 
 
 class CoursePlan(Base):
-    """开课计划模型。
+    """开课计划模型（教师申请制）。
 
-    每个课程可在多个学期开课，产生不同的开课计划。
-    包含授课教师、时间地点、容量限制、先修课要求等信息。
+    教师提交开课申请，管理员审核通过后生效。
+    使用 weekday + period_start + period_count 精确描述上课时间。
+    start_week + end_week 定义教学周范围（1-20）。
     """
 
     __tablename__ = "course_plan"
@@ -54,9 +55,33 @@ class CoursePlan(Base):
         nullable=False,
         comment="开课学期，如 2026-2027-1",
     )
-    time_slot = Column(
-        String(50),
-        comment="上课时间，如 周一1-2节",
+    weekday = Column(
+        Integer,
+        nullable=False,
+        comment="上课日: 1=周一 ... 7=周日",
+    )
+    period_start = Column(
+        Integer,
+        nullable=False,
+        comment="起始节次 (1-11)",
+    )
+    period_count = Column(
+        Integer,
+        nullable=False,
+        default=2,
+        comment="持续节数 (1-11)",
+    )
+    start_week = Column(
+        Integer,
+        nullable=False,
+        default=1,
+        comment="起始教学周 (1-20)",
+    )
+    end_week = Column(
+        Integer,
+        nullable=False,
+        default=20,
+        comment="结束教学周 (1-20)",
     )
     location = Column(
         String(100),
@@ -76,9 +101,13 @@ class CoursePlan(Base):
         comment="先修课程代码，多个以逗号分隔",
     )
     status = Column(
-        SAEnum("开课", "停课"),
-        default="开课",
-        comment="开课状态: 开课/停课",
+        SAEnum("待审核", "已通过", "已驳回", "已停课"),
+        default="待审核",
+        comment="审核状态: 待审核/已通过/已驳回/已停课",
+    )
+    audit_comment = Column(
+        String(500),
+        comment="审核意见",
     )
     created_at = Column(
         DateTime,
@@ -95,7 +124,23 @@ class CoursePlan(Base):
     # 联合索引
     __table_args__ = (
         Index("idx_course_semester", "course_id", "semester"),
+        Index("idx_course_plan_status", "status"),
     )
+
+    @property
+    def time_slot_display(self) -> str:
+        """生成人类可读的上课时间描述。
+
+        Returns:
+            str: 如 '周一 1-2节 (第1-18周)'
+        """
+        weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+        w = weekdays[self.weekday - 1] if 1 <= self.weekday <= 7 else "未知"
+        return (
+            f"{w} {self.period_start}-"
+            f"{self.period_start + self.period_count - 1}节 "
+            f"(第{self.start_week}-{self.end_week}周)"
+        )
 
     def __repr__(self):
         return (
@@ -114,12 +159,18 @@ class CoursePlan(Base):
             "course_id": self.course_id,
             "teacher_id": self.teacher_id,
             "semester": self.semester,
-            "time_slot": self.time_slot,
+            "weekday": self.weekday,
+            "period_start": self.period_start,
+            "period_count": self.period_count,
+            "start_week": self.start_week,
+            "end_week": self.end_week,
+            "time_slot": self.time_slot_display,
             "location": self.location,
             "capacity": self.capacity,
             "enrolled": self.enrolled,
             "prerequisite": self.prerequisite,
             "status": self.status,
+            "audit_comment": self.audit_comment,
             "created_at": (
                 self.created_at.isoformat() if self.created_at else None
             ),
