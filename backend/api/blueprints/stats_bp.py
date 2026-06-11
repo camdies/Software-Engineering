@@ -44,6 +44,7 @@ def export_stats():
 
     请求体: {"type": "class", "plan_id": 1, "class_name": "..."}
     或: {"type": "academic", "student_id": "S001"}
+    或: {"type": "schedule", "student_id": "S001"}
     """
     data = request.get_json(silent=True) or {}
     export_type = data.get("type", "class")
@@ -60,6 +61,9 @@ def export_stats():
     elif export_type == "academic":
         student_id = data.get("student_id") or g.current_user["user_id"]
         sd = StatsController().get_academic_stats(student_id)
+    elif export_type == "schedule":
+        student_id = data.get("student_id") or g.current_user["user_id"]
+        sd = StatsController().get_schedule_data(student_id)
     else:
         return error_response("不支持的导出类型")
 

@@ -123,3 +123,15 @@ class Settings:
     @property
     def enrollment_close_time(self) -> str:
         return self._config.get("enrollment", "close_time", fallback="")
+
+    @property
+    def default_total_weeks(self) -> int:
+        return self._config.getint("system", "default_total_weeks", fallback=20)
+
+    @property
+    def jwt_secret(self) -> str:
+        return self._config.get("web", "jwt_secret", fallback="")
+
+    @property
+    def jwt_expiration_hours(self) -> int:
+        return self._config.getint("web", "jwt_expiration_hours", fallback=24)

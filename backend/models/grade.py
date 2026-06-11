@@ -73,6 +73,10 @@ class Grade(Base):
         String(500),
         comment="成绩修改原因",
     )
+    new_score = Column(
+        Integer,
+        comment="申请修改的目标分数",
+    )
     created_at = Column(
         DateTime,
         default=datetime.now,
@@ -112,6 +116,7 @@ class Grade(Base):
             ),
             "status": self.status,
             "modify_reason": self.modify_reason,
+            "new_score": self.new_score,
             "created_at": (
                 self.created_at.isoformat() if self.created_at else None
             ),

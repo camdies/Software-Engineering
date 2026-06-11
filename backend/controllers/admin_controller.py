@@ -74,44 +74,45 @@ class AdminController:
 
     def create_student(self, student_id: str, name: str,
                        major: str = None, class_name: str = None,
-                       contact: str = None) -> dict:
+                       contact: str = None, email: str = None,
+                       grade: str = None, password: str = None) -> dict:
         """创建学生信息。
 
-        同时在user_account表中创建对应账号（默认密码123456）。
+        同时在user_account表中创建对应账号（默认密码123456或由管理员指定）。
         """
         try:
             from backend.utils.auth_util import hash_password
+            pwd = password if password and len(password) >= 6 else "123456"
             with self._db.get_session() as session:
-                # 检查是否已存在
                 existing = session.query(UserAccount).filter_by(
                     user_id=student_id).first()
                 if existing:
                     return {"success": False, "message": "该学号已存在"}
 
-                # 创建user_account
                 account = UserAccount(
                     user_id=student_id,
-                    password_hash=hash_password("123456"),
+                    password_hash=hash_password(pwd),
                     role="student",
                     is_locked=0,
                     login_fail_count=0,
                 )
                 session.add(account)
 
-                # 创建student
                 student = Student(
                     student_id=student_id,
                     name=name,
                     major=major,
                     class_name=class_name,
+                    grade=grade,
+                    email=email,
                     contact=contact,
                 )
                 session.add(student)
 
                 self._write_log(session, "admin", "系统",
-                                f"创建学生: {student_id}", "成功", "")
+                                f"创建学生: {student_id} (默认密码: {pwd})", "成功", "")
                 logger.info(f"创建学生: {student_id}")
-                return {"success": True, "message": "学生创建成功"}
+                return {"success": True, "message": f"学生创建成功，默认密码: {pwd}"}
 
         except Exception as e:
             logger.error(f"创建学生异常: {e}", exc_info=True)
@@ -214,13 +215,16 @@ class AdminController:
                     "data": []}
 
     def create_teacher(self, teacher_id: str, name: str,
-                       college: str = None, contact: str = None) -> dict:
+                       college: str = None, title: str = None,
+                       contact: str = None, email: str = None,
+                       password: str = None) -> dict:
         """创建教师信息。
 
-        同时在user_account表中创建对应账号（默认密码123456）。
+        同时在user_account表中创建对应账号（默认密码123456或由管理员指定）。
         """
         try:
             from backend.utils.auth_util import hash_password
+            pwd = password if password and len(password) >= 6 else "123456"
             with self._db.get_session() as session:
                 existing = session.query(UserAccount).filter_by(
                     user_id=teacher_id).first()
@@ -228,7 +232,7 @@ class AdminController:
                     return {"success": False, "message": "该工号已存在"}
                 account = UserAccount(
                     user_id=teacher_id,
-                    password_hash=hash_password("123456"),
+                    password_hash=hash_password(pwd),
                     role="teacher",
                     is_locked=0,
                     login_fail_count=0,
@@ -238,13 +242,15 @@ class AdminController:
                     teacher_id=teacher_id,
                     name=name,
                     college=college,
+                    title=title,
+                    email=email,
                     contact=contact,
                 )
                 session.add(teacher)
                 self._write_log(session, "admin", "系统",
-                                f"创建教师: {teacher_id}", "成功", "")
+                                f"创建教师: {teacher_id} (默认密码: {pwd})", "成功", "")
                 logger.info(f"创建教师: {teacher_id}")
-                return {"success": True, "message": "教师创建成功"}
+                return {"success": True, "message": f"教师创建成功，默认密码: {pwd}"}
         except Exception as e:
             logger.error(f"创建教师异常: {e}", exc_info=True)
             return {"success": False, "message": "操作失败，请重试"}
@@ -327,7 +333,10 @@ class AdminController:
 
     def create_course(self, course_id: str, course_name: str,
                       credit: float = None, hours: int = None,
-                      exam_type: str = None) -> dict:
+                      exam_type: str = None, department: str = None,
+                      course_type: str = None, target_major: str = None,
+                      description: str = None, textbook: str = None,
+                      syllabus: str = None, instructor_intro: str = None) -> dict:
         """创建课程信息。"""
         try:
             with self._db.get_session() as session:
@@ -341,6 +350,13 @@ class AdminController:
                     credit=credit,
                     hours=hours,
                     exam_type=exam_type,
+                    department=department,
+                    course_type=course_type,
+                    target_major=target_major,
+                    description=description,
+                    textbook=textbook,
+                    syllabus=syllabus,
+                    instructor_intro=instructor_intro,
                 )
                 session.add(course)
                 self._write_log(session, "admin", "系统",
