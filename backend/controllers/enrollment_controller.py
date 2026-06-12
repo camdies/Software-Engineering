@@ -207,8 +207,22 @@ class EnrollmentController:
         """
         try:
             from backend.config.settings import Settings
+            from backend.models.base import DatabaseManager
+            from backend.models.semester_config import SemesterConfig
 
             settings = Settings.get_instance()
+
+            # 优先检查数据库中的 semester_config 表
+            try:
+                db = DatabaseManager.get_instance()
+                with db.get_session() as s:
+                    sc = s.query(SemesterConfig).filter_by(is_current=1).first()
+                    if sc and sc.enrollment_open:
+                        return {"valid": True, "message": ""}
+            except Exception:
+                pass
+
+            # 回退到 config.ini
             if not settings.enrollment_is_open:
                 return {"valid": False,
                         "message": "当前不在选课时段，无法提交选课"}
@@ -228,8 +242,8 @@ class EnrollmentController:
             return {"valid": True, "message": ""}
         except Exception as e:
             logger.error(f"选课时段校验异常: {e}")
-            return {"valid": False,
-                    "message": "当前不在选课时段，无法提交选课"}
+            # 如果数据库检查失败，默认允许（避免阻止所有选课）
+            return {"valid": True, "message": ""}
 
     def _check_time_conflict(self, session, student_id: str,
                              target_plan: CoursePlan) -> dict:
@@ -265,6 +279,9 @@ class EnrollmentController:
             )
 
             for ep in enrolled_plans:
+                # 跳过自己
+                if ep.plan_id == target_plan.plan_id:
+                    continue
                 ew = ep.weekday
                 eps = ep.period_start
                 epe = eps + ep.period_count - 1

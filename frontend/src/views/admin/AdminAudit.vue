@@ -109,6 +109,9 @@ async function fetchPwd() {
   try {
     const res = await request.get('/audit/password-resets')
     pwdList.value = (res.data?.items || []).map(r => ({ ...r, _comment: '' }))
+  } catch (e) {
+    console.error('fetchPwd error', e)
+    ElMessage.error('获取密码重置列表失败')
   } finally { pwdLoading.value = false }
 }
 
@@ -117,6 +120,9 @@ async function fetchGrade() {
   try {
     const res = await request.get('/admin/grades/pending')
     gradeList.value = (res.data?.items || []).map(r => ({ ...r, _comment: '' }))
+  } catch (e) {
+    console.error('fetchGrade error', e)
+    ElMessage.error('获取成绩审核列表失败')
   } finally { gradeLoading.value = false }
 }
 
@@ -125,6 +131,9 @@ async function fetchPlan() {
   try {
     const res = await request.get('/audit/course-plans')
     planList.value = (res.data?.items || []).map(r => ({ ...r, _comment: '' }))
+  } catch (e) {
+    console.error('fetchPlan error', e)
+    ElMessage.error('获取课程审核列表失败')
   } finally { planLoading.value = false }
 }
 
