@@ -1,103 +1,141 @@
-# 开发伙伴协作指南 — 主机端 + 伙伴端双人配置
+# EduMgmt System - Developer Partner Collaboration Guide
 
-> 把你的电脑作为服务器，让开发伙伴在局域网内直接访问你的项目。
-> 提供一键启停、状态查看、分发打包、伙伴自动配置等全套工具。
+> Turn your computer into a shared development server. Partners can connect via LAN or the internet using ngrok. Includes one-click start/stop, status monitoring, package distribution, and partner auto-configuration tools.
 
 ---
 
-## 一、主机端操作（在你的电脑上）— 使用 server_control.bat
+## I. Host Setup (your computer) — server_control.bat
 
-**你不需要手动敲命令**，双击项目根目录下的 `server_control.bat` 即可。
+**No manual commands needed.** Double-click `server_control.bat` in the project root.
 
-### 菜单说明
+### Menu
 
-| 选项 | 功能 |
-|------|------|
-| `[1]` 启动服务器 (仅本机) | `python run.py` → `http://localhost:5000` |
-| `[2]` 启动服务器 (公开) | `python run.py --public` → 局域网伙伴可访问 |
-| `[3]` 停止服务器 | 自动查找并关闭 python.exe 进程 |
-| `[4]` 查看服务器状态 | 显示运行状态、防火墙规则、数据库、本机 IP |
-| `[5]` 重建前端+启动 | `npm run build` 后启动公开模式 |
-| `[6]` 伙伴连接信息查看 | 显示伙伴需要的完整连接参数 |
-| `[7]` 打包分发给伙伴 | 自动打包项目（排除无关文件） |
-| `[0]` 退出 | 关闭控制面板 |
+| Option | What it does |
+|--------|-------------|
+| `[1]` Start server (localhost) | `python run.py` → `http://localhost:5000` |
+| `[2]` Start server (LAN public) | `python run.py --public` → accessible by LAN partners |
+| `[3]` Stop server | Kills all python.exe and ngrok.exe processes |
+| `[4]` View server status | Running state, firewall rules, database, local IP |
+| `[5]` Rebuild frontend + start | `npm run build` then start in public mode |
+| `[6]` Partner connection info | Shows everything your partner needs to connect |
+| `[7]` Package and distribute | Auto-zips project (excluding node_modules) for sharing |
+| `[8]` Install ngrok | Install/setup ngrok for internet access |
+| `[9]` Start server with ngrok | Flask + ngrok tunnel for global internet access |
+| `[0]` Exit | Closes control panel |
 
-### 首次运行前需要做的事（仅一次）
+### One-time setup (do this first)
 
-**1. 开放防火墙**
-
-以**管理员身份**运行一次 PowerShell：
+**1. Open Windows firewall** (run PowerShell as Administrator):
 
 ```powershell
 New-NetFirewallRule -DisplayName "EduMgmt Flask 5000" -Direction Inbound -Protocol TCP -LocalPort 5000 -Action Allow
 ```
 
-**2. 设置 JWT 固定密钥**（避免重启后全部用户掉线）
+**2. Set a fixed JWT secret** (prevents all users from being logged out on restart):
 
-编辑 `backend\config\config.ini`，在 `[web]` 段填一个固定值：
+Edit `backend\config\config.ini`, add a fixed value in `[web]`:
 
 ```ini
 [web]
-jwt_secret = my-very-secret-key-change-this
-```
-
-### 日常使用流程
-
-```
-1. 双击 server_control.bat
-2. 输入 2（启动公开模式）
-3. 服务器启动，终端保持运行
-4. 伙伴即可通过 http://你的IP:5000 访问
-5. 要停止时，关闭终端窗口，或重新打开 server_control.bat 选 [3]
+jwt_secret = my-secret-key-change-this-to-something-unique
+jwt_expiration_hours = 24
 ```
 
 ---
 
-## 二、伙伴端操作（开发伙伴的电脑上）— 使用 partner_connect.bat
+### Daily usage flow
 
-### 方式 A：浏览器直接使用（零安装）
-
-主机启动后，伙伴浏览器打开 `http://主机IP:5000` 即可。默认账号 `admin / 123456`。
-
-### 方式 B：前端开发模式（推荐，可改代码）
-
-1. 从 GitHub 拉取项目，或从主机接收分发包 `edu-mgmt-dist.zip`
-2. 解压后，双击项目根目录下的 **`partner_connect.bat`**
-3. 输入主机的局域网 IP 地址
-4. 脚本自动配置 `VITE_API_TARGET`，可选立即启动 `npm run dev`
-5. 浏览器打开 `http://localhost:5173`，所有 API 代理到主机
-
-**partner_connect.bat 做了什么：**
-- 设置 `frontend/.env.local` 中的 `VITE_API_TARGET` 指向主机
-- 自动 ping 测试主机连通性
-- 显示连接信息摘要
-- 可选一键启动前端开发服务器
-
-### 方式 C：独立运行全部
-
-按 `SQL_SERVER_SETUP_GUIDE.md` 在伙伴电脑安装 SQL Server 并初始化数据库，完全独立运行。
+```
+1. Double-click server_control.bat
+2. Press 2 for LAN or 9 for internet (ngrok)
+3. Server starts, keep the terminal running
+4. Partner accesses: http://your-IP:5000  (or the ngrok URL)
+5. To stop: close the terminal, or re-run server_control.bat and press 3
+```
 
 ---
 
-## 三、工具文件说明
+### How to enable internet access (option 9)
 
-| 文件 | 用途 | 谁用 |
-|------|------|------|
-| `server_control.bat` | 服务器控制面板（启停/状态/分发） | 主机（你） |
-| `partner_connect.bat` | 伙伴连接配置工具（自动代理设置） | 开发伙伴 |
-| `run.py --public` | Flask 公开模式入口 | 主机 |
-| `frontend/.env.local` | Vite 代理目标（partner_connect.bat 自动生成） | 伙伴 |
-| `SETUP_PARTNER.md` | 本文档 | 双方 |
+When you and your partner are **not on the same network**:
+
+1. In server_control.bat, press `[8]` to install ngrok
+2. Sign up for a free account at https://dashboard.ngrok.com/signup
+3. Copy your authtoken from https://dashboard.ngrok.com/get-started/your-authtoken
+4. Run: `ngrok config add-authtoken YOUR_TOKEN` (paste your actual token)
+5. Now press `[9]` — it starts both Flask and ngrok together
+6. Open http://127.0.0.1:4040 in your browser to see the public URL
+7. Share that URL (looks like `https://xxxx.ngrok-free.app`) with your partner
+
+**ngrok free tier limits:**
+- 1 tunnel at a time
+- Bandwidth: ~1 GB/month
+- The URL changes every time you restart (unless you reserve a domain with ngrok's paid plan)
+- Session expires after ~2 hours of the terminal being open
 
 ---
 
-## 四、快速排查
+### Partner flow
 
-| 问题 | 检查 |
-|------|------|
-| 伙伴连不上 | 主机 `server_control.bat` → `[4]` 查看状态 |
-| 伙伴 ping 不通 | 两台电脑是否在同一局域网/同一网段 |
-| 伙伴能 ping 但网页打不开 | 主机防火墙是否放行 5000 端口 |
-| 页面打开但 API 报错 | 主机检查 `config.ini` 数据库密码是否正确 |
-| 登录后频繁掉线 | 在 `config.ini` 中配置固定 `jwt_secret` |
-| 外网访问（不在同一局域网） | 主机安装 [ngrok](https://ngrok.com/): `ngrok http 5000` |
+1. Host starts server (option `[2]` or `[9]`)
+2. Host runs option `[6]` to see connection info
+3. **For LAN**: host shares `http://192.168.x.x:5000`
+4. **For internet**: host shares the ngrok URL from http://127.0.0.1:4040
+5. Partner enters the URL in their browser or configures it via `partner_connect.bat`
+
+---
+
+## II. Partner Setup (partner's computer) — partner_connect.bat
+
+### Option A: Browser only (zero install)
+
+Open the URL the host gives you. Default login: `admin / 123456`
+
+### Option B: Frontend dev mode (recommended, can edit code)
+
+1. Pull from GitHub, or receive `edu-mgmt-dist.zip` from the host
+2. Extract, then double-click **`partner_connect.bat`** in the project root
+3. Choose `[1]` for LAN or `[2]` for internet
+4. Enter the host's IP or ngrok URL
+5. The script auto-configures `VITE_API_TARGET` and tests connectivity
+6. Optionally launch `npm run dev` immediately
+7. Open `http://localhost:5173` — all API calls proxy to the host
+
+**What partner_connect.bat does:**
+- Creates `frontend/.env.local` with `VITE_API_TARGET` pointing to host
+- Auto-detects https for ngrok URLs
+- Pings (LAN) or tests API (remote) to verify connectivity
+- Shows connection summary
+- Optional one-click frontend dev server launch
+
+### Option C: Full independent setup
+
+Follow `SQL_SERVER_SETUP_GUIDE.md` to install SQL Server locally for full independent development.
+
+---
+
+## III. Tool Reference
+
+| File | Purpose | Who uses it |
+|------|---------|------------|
+| `server_control.bat` | Interactive server control panel (start/stop/status/distribute/ngrok) | Host (you) |
+| `partner_connect.bat` | Auto-configure proxy target, test connectivity | Partner |
+| `run.py --public` | Flask public mode (binds 0.0.0.0) | Host |
+| `frontend/.env.local` | Vite proxy target (auto-generated by partner_connect.bat) | Partner |
+| `SETUP_PARTNER.md` | This document | Both |
+
+---
+
+## IV. Troubleshooting
+
+| Problem | Check |
+|---------|-------|
+| Partner can't connect | Host: `server_control.bat` → `[4]` check status |
+| Partner can't ping host | Are both computers on same LAN/subnet? |
+| Can ping but page won't load | Host firewall: is port 5000 open? |
+| Page loads but API errors | Host: check `config.ini` database password |
+| Frequent logout during use | Set fixed `jwt_secret` in `config.ini` `[web]` section |
+| Internet access (different networks) | Host: use `[8]` install ngrok, `[9]` start tunnel |
+| ngrok: "authentication failed" | Run `ngrok config add-authtoken YOUR_TOKEN` |
+| ngrok: "address already in use" | Another ngrok instance is running — use `[3]` to kill it |
+| Public URL changes every time | Free ngrok limitation; paid plan supports fixed domains |
