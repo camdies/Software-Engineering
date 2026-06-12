@@ -30,13 +30,13 @@ echo --------------------------------------------------
 echo   Server Control
 echo   [1] Start server (localhost only)
 echo   [2] Start server (LAN public)
-echo   [3] Stop server (kill all python + ngrok)
+echo   [3] Stop server
 echo   [4] View server status
 echo   [5] Rebuild frontend and start
 echo.
-echo   External Access (Internet)
-echo   [8] Install / setup ngrok
-echo   [9] Start server + ngrok tunnel
+echo   Global Internet Access (no third-party tools)
+echo   [8] Setup campus/public network access guide
+echo   [9] Start server for external access
 echo.
 echo   Collaboration Tools
 echo   [6] Partner connection info
@@ -54,8 +54,8 @@ if "%CHOICE%"=="4" goto :status
 if "%CHOICE%"=="5" goto :rebuild
 if "%CHOICE%"=="6" goto :partner_info
 if "%CHOICE%"=="7" goto :distribute
-if "%CHOICE%"=="8" goto :install_ngrok
-if "%CHOICE%"=="9" goto :start_ngrok
+if "%CHOICE%"=="8" goto :ext_access_guide
+if "%CHOICE%"=="9" goto :start_external
 if "%CHOICE%"=="0" goto :end
 echo Invalid option, try again
 pause
@@ -99,6 +99,10 @@ for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq ngrok.exe" /FO TABLE /NH 2
     echo   Stopping ngrok.exe PID=%%a
     taskkill /F /PID %%a >nul 2>&1
 )
+for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq frpc.exe" /FO TABLE /NH 2^>nul') do (
+    echo   Stopping frpc.exe PID=%%a
+    taskkill /F /PID %%a >nul 2>&1
+)
 echo   Done.
 pause
 goto :end
@@ -119,19 +123,17 @@ if %PY_COUNT% gtr 0 (
 )
 echo.
 
-set "NGROK_COUNT=0"
-for /f "tokens=1" %%a in ('tasklist /FI "IMAGENAME eq ngrok.exe" /FO TABLE /NH 2^>nul') do set /a NGROK_COUNT+=1
-if %NGROK_COUNT% gtr 0 (
-    echo   ngrok Tunnel   : RUNNING
-    echo   ngrok status   : http://127.0.0.1:4040
-) else (
-    echo   ngrok Tunnel   : STOPPED
+:: Check public/WAN IP
+echo   ---- Network Info ----
+echo   Local (LAN) IP : %LOCAL_IP%
+for /f "tokens=*" %%p in ('curl -s ifconfig.me 2^>nul') do (
+    if not "%%p"=="" echo   Public (WAN) IP : %%p
 )
 echo.
 
 echo   ---- Firewall ----
 netsh advfirewall firewall show rule name="EduMgmt Flask 5000" 2>nul | findstr /i "Enabled" >nul
-if %errorlevel% equ 0 (echo   Port 5000 : OPEN) else (echo   Port 5000 : CLOSED - run: netsh advfirewall ... allow 5000)
+if %errorlevel% equ 0 (echo   Port 5000 : OPEN) else (echo   Port 5000 : CLOSED - firewall rule needed)
 echo.
 
 echo   ---- Database ----
@@ -142,8 +144,6 @@ if %errorlevel% equ 0 (
     sc query MSSQLSERVER 2>nul | findstr "RUNNING" >nul
     if %errorlevel% equ 0 (echo   SQL Server (MSSQLSERVER): RUNNING) else (echo   SQL Server: NOT DETECTED)
 )
-echo.
-echo   Network: %LOCAL_IP%
 pause
 goto :end
 
@@ -155,8 +155,7 @@ echo   Building frontend...
 cd frontend
 call npm run build
 cd ..
-echo   Done.
-echo   Starting server (public)...
+echo   Done. Starting server (public)...
 start http://localhost:5000
 python run.py --public
 goto :end
@@ -185,15 +184,16 @@ echo   ^|    STU001 / 123456                              ^|
 echo   +--------------------------------------------------+
 echo.
 
-where ngrok >nul 2>&1
-if %errorlevel% equ 0 (
-    echo   ngrok: INSTALLED - use [9] for internet access
-    for /f "tokens=*" %%u in ('curl -s http://127.0.0.1:4040/api/tunnels 2^>nul ^| findstr /i "public_url"') do (
-        echo   Current tunnel: %%u
+:: Check public IP
+for /f "tokens=*" %%p in ('curl -s --connect-timeout 5 ifconfig.me 2^>nul') do (
+    if not "%%p"=="" (
+        echo   Public (WAN) IP detected: %%p
+        echo   If port forwarding is set: http://%%p:5000
     )
-) else (
-    echo   ngrok: NOT INSTALLED - use [8] to install for internet access
 )
+echo.
+echo   For external access without VPN/proxy tools:
+echo   See option [8] External Access Setup Guide
 echo.
 pause
 goto :end
@@ -226,169 +226,152 @@ echo.
 echo   Partner steps:
 echo   1. Extract zip
 echo   2. Run: partner_connect.bat
-echo   3. Enter: %LOCAL_IP%
+echo   3. Enter the server IP or public URL
 echo   4. Choose LAN or internet mode
 echo.
 pause
 goto :end
 
 :: =================================================================
-:install_ngrok
+:ext_access_guide
 :: =================================================================
 echo.
-echo   ngrok Setup for Internet Access
-echo   ================================
+echo   +==========================================================+
+echo   ^|  校园网/公网访问设置指南（无需第三方工具）              ^|
+echo   +==========================================================+
 echo.
-echo   ngrok creates a public URL so partners anywhere on the
-echo   internet can access your local server.
+echo   在中国校园网环境下，可以通过以下方式实现外网访问：
 echo.
-
-where ngrok >nul 2>&1
-if %errorlevel% equ 0 (
-    echo   ngrok already installed:
-    ngrok version 2>&1 | findstr /i "ngrok"
-    echo.
-    echo   To verify auth: ngrok http 5000
-    echo   If you get "authentication failed", run:
-    echo     ngrok config add-authtoken YOUR_TOKEN
-    echo   Get your token at: https://dashboard.ngrok.com/get-started/your-authtoken
-    pause
-    goto :end
+echo   ---- 方案一：校园网内直接访问（最简单）----
+echo.
+echo   如果你的开发伙伴和你同一个校园网（同一网段），
+echo   直接用 [2] 局域网模式即可，不需要额外配置。
+echo   URL: http://%LOCAL_IP%:5000
+echo.
+echo   ---- 方案二：路由器端口映射（有公网 IP）----
+echo.
+echo   前提：你的校园网/家庭宽带分配了公网 IPv4 地址
+echo   （移动/联通/电信宽带有概率获得公网 IP，校园网通常没有）
+echo.
+echo   步骤：
+echo   1. 先查询你的公网 IP:
+for /f "tokens=*" %%p in ('curl -s --connect-timeout 5 ifconfig.me 2^>nul') do (
+    if not "%%p"=="" echo      当前公网 IP: %%p
 )
-
-if exist "%USERPROFILE%\ngrok\ngrok.exe" (
-    echo   Found ngrok at %USERPROFILE%\ngrok\ngrok.exe
-    echo   Adding to current session PATH...
-    set "PATH=!PATH!;%USERPROFILE%\ngrok"
-    echo   Done.
-    pause
-    goto :end
-)
-
-echo   Option 1: Install with winget
-echo   Option 2: Manual install
+echo   2. 登录路由器管理页面（通常是 http://192.168.1.1）
+echo      品牌       默认地址         默认账号/密码
+echo      TP-Link    192.168.1.1      admin/admin
+echo      Xiaomi     192.168.31.1     见路由器底部
+echo      Huawei     192.168.3.1      admin/admin
+echo      ASUS       192.168.50.1     admin/admin
+echo   3. 找到"端口转发"/"虚拟服务器"/"Port Forwarding"
+echo   4. 添加规则:
+echo      服务端口: 5000
+echo      内部 IP:  %LOCAL_IP%
+echo      内部端口: 5000
+echo      协议: TCP
+echo   5. 保存并应用
+echo   6. 外网访问地址: http://你的公网IP:5000
 echo.
-set /p NG_INSTALL="Choose [1-2]: "
-if "%NG_INSTALL%"=="1" (
-    winget install ngrok 2>&1
-    if %errorlevel% equ 0 (
-        echo   ngrok installed via winget.
-        echo   Now run: ngrok config add-authtoken YOUR_TOKEN
-    ) else (
-        echo   winget failed. Try option 2.
-    )
-    pause
-    goto :end
-)
-
+echo   ---- 方案三：IPv6 直连（推荐，校园网通常支持）----
 echo.
-echo   Manual install steps:
-echo   1. Open https://ngrok.com/download
-echo   2. Download "ngrok for Windows" (zip)
-echo   3. Extract ngrok.exe to: %USERPROFILE%\ngrok\
-echo   4. Open https://dashboard.ngrok.com/signup (free)
-echo   5. Copy your authtoken from dashboard
-echo   6. Run in terminal:
-echo      %USERPROFILE%\ngrok\ngrok.exe config add-authtoken YOUR_TOKEN
-echo   7. Then option [9] will work
+echo   中国高校校园网普遍已部署 IPv6，每台设备都会分配
+echo   独立的公网 IPv6 地址，无需端口映射即可直连！
+echo.
+echo   1. 查询本机 IPv6 地址:
+echo      ipconfig ^| findstr "IPv6"
+echo   2. 开放的 IPv6 地址通常是临时地址（Temporary）或
+echo      公共地址（Public），不是以 fe80 开头的本地地址
+echo   3. 在 Windows 防火墙中放行 IPv6 的 5000 端口:
+echo      netsh advfirewall firewall add rule name="EduMgmt IPv6" dir=in action=allow protocol=TCP localport=5000
+echo   4. 伙伴访问地址: http://[你的IPv6地址]:5000
+echo      注意: 必须用方括号包裹 IPv6 地址!
+echo      例如: http://[2001:da8:xxxx:xxxx::1]:5000
+echo   5. 注意: IPv6 隐私扩展会导致地址定期变化
+echo.
+echo   ---- 方案四：使用 frp 内网穿透（自建）----
+echo.
+echo   如果你有一台有公网 IP 的云服务器（阿里云/腾讯云
+echo   学生价约 10 元/月），可以自建 frp 替代 ngrok。
+echo.
+echo   服务端（云服务器）配置 frps.ini:
+echo     [common]
+echo     bind_port = 7000
+echo     vhost_http_port = 8080
+echo.
+echo   客户端（你的电脑）配置 frpc.ini:
+echo     [common]
+echo     server_addr = 你的服务器IP
+echo     server_port = 7000
+echo     [web]
+echo     type = http
+echo     local_port = 5000
+echo     custom_domains = 你的域名或IP
+echo.
+echo   下载 frp: https://github.com/fatedier/frp/releases
+echo.
+echo   ---- 方案五：ZeroTier / Tailscale 虚拟组网 ----
+echo.
+echo   创建虚拟局域网，你和伙伴安装客户端后，
+echo   就可以像在同一局域网一样互相访问。
+echo   ZeroTier 免费支持 25 个设备。
+echo   网址: https://www.zerotier.com/
+echo.
+echo   ---- 方案六：Cloudflare Tunnel（免费）----
+echo.
+echo   Cloudflare Tunnel 类似于 ngrok 但完全免费，无限流量。
+echo   需要一个域名（可以注册免费域名如 .tk/.ml）。
+echo   网址: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+echo.
+echo   +==========================================================+
+echo   ^|  推荐优先级：同一局域网 ^> IPv6 直连 ^> 端口映射        ^|
+echo   ^|              ^> ZeroTier ^> frp ^> Cloudflare Tunnel    ^|
+echo   +==========================================================+
 echo.
 pause
 goto :end
 
 :: =================================================================
-:start_ngrok
+:start_external
 :: =================================================================
-:: Resolve ngrok location
-set "NGROK_EXE=ngrok"
-where ngrok >nul 2>&1
-if %errorlevel% neq 0 (
-    if exist "%USERPROFILE%\ngrok\ngrok.exe" (
-        set "NGROK_EXE=%USERPROFILE%\ngrok\ngrok.exe"
-    ) else if exist "C:\ngrok\ngrok.exe" (
-        set "NGROK_EXE=C:\ngrok\ngrok.exe"
-    ) else (
-        echo   ngrok not found!
-        echo   Option [8] first to install, or put ngrok.exe in
-        echo   %%USERPROFILE%%\ngrok\ or somewhere in PATH.
-        pause
-        goto :end
-    )
-)
-
 echo.
 echo   +--------------------------------------------------+
-echo   ^|  Starting Flask + ngrok tunnel                   ^|
+echo   ^|  Start server for external access                ^|
 echo   +--------------------------------------------------+
 echo.
-echo   Flask : http://localhost:5000
-echo   LAN   : http://%LOCAL_IP%:5000
-echo   ngrok : starting tunnel...
+echo   This starts Flask on 0.0.0.0:5000 so it accepts
+echo   connections from any network interface (LAN, IPv6,
+echo   port-forwarded WAN, VPN, etc.)
+echo.
+echo   Before starting, ensure:
+echo   1. Firewall allows port 5000 (inbound)
+echo   2. If using router port forwarding, it is configured
+echo   3. If using IPv6, your partner has your IPv6 address
+echo.
+echo   Current network info:
+echo     LAN IPv4 : %LOCAL_IP%
+for /f "tokens=*" %%p in ('curl -s --connect-timeout 3 ifconfig.me 2^>nul') do (
+    if not "%%p"=="" echo     Public IP: %%p
+)
+for /f "tokens=1,2 delims=:" %%a in ('ipconfig ^| findstr /i "IPv6" ^| findstr /v "fe80" ^| findstr /v "::1"') do (
+    for /f "tokens=*" %%c in ("%%b") do echo     IPv6     : %%a:%%c
+)
+echo.
 
-:: Kill any existing ngrok first
-taskkill /F /IM ngrok.exe >nul 2>&1
-
-:: Open Flask in its own minimized window, hidden
-start "EduMgmt-Flask" /MIN python run.py --public
-
-:: Wait for Flask to be ready
-echo   Waiting for Flask to start...
-set /a WAIT=0
-:wait_flask
-ping -n 2 127.0.0.1 >nul
-set /a WAIT+=1
-curl -s -o nul http://127.0.0.1:5000 2>nul
+:: Open firewall if needed
+netsh advfirewall firewall show rule name="EduMgmt Flask 5000" 2>nul | findstr /i "Enabled" >nul
 if %errorlevel% neq 0 (
-    if %WAIT% lss 15 goto :wait_flask
+    echo   Firewall rule missing. Adding now...
+    netsh advfirewall firewall add rule name="EduMgmt Flask 5000" dir=in action=allow protocol=TCP localport=5000 >nul 2>&1
+    echo   Done.
 )
-if %WAIT% lss 15 (
-    echo   Flask ready (after %WAIT% seconds).
-) else (
-    echo   Flask may not be ready, but starting ngrok anyway...
-)
-
-:: Start ngrok in a new visible window so user can see the URL
-echo   Starting ngrok...
-start "EduMgmt-ngrok" "%NGROK_EXE%" http 5000
-
-:: Wait for ngrok to establish
-echo   Waiting for ngrok tunnel to establish...
-set /a WAIT=0
-set "NGROK_URL="
-:wait_ngrok
-ping -n 2 127.0.0.1 >nul
-set /a WAIT+=1
-:: Try to get public URL from ngrok's local API
-for /f "delims=" %%u in ('curl -s http://127.0.0.1:4040/api/tunnels 2^>nul ^| findstr /r "public_url"') do set "NGROK_URL=%%u"
-if "%NGROK_URL%"=="" (
-    if %WAIT% lss 10 goto :wait_ngrok
-)
-
 echo.
-echo   +==================================================+
-echo   ^|  ngrok TUNNEL ACTIVE                            ^|
-echo   +==================================================+
+echo   Starting Flask with external access...
+echo   Press Ctrl+C to stop, or use option [3] in another window.
 echo.
 
-if not "%NGROK_URL%"=="" (
-    echo   Public URL: %NGROK_URL%
-) else (
-    echo   Open http://127.0.0.1:4040 to see the public URL
-    start http://127.0.0.1:4040
-)
-
-echo.
-echo   Share this URL with your partner.
-echo   They can access from anywhere on the internet!
-echo.
-echo   +==================================================+
-echo.
-echo   Press Ctrl+C in the ngrok window to stop the tunnel.
-echo   Or run this script and choose [3] to stop everything.
-echo.
-echo   This window will stay open. Press any key to open
-echo   the ngrok status page and check the public URL...
-pause >nul
-start http://127.0.0.1:4040
+start http://localhost:5000
+python run.py --public
 goto :end
 
 :end
