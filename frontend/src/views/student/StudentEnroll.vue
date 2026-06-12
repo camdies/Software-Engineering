@@ -147,12 +147,12 @@
         </h5>
         <div class="week-heatmap">
           <div class="heatmap-header">
-            <span class="hm-label">节次</span>
-            <span v-for="d in 7" :key="d" class="hm-header-cell">{{ weekdayNames[d - 1] }}</span>
+            <span class="hm-label">日期</span>
+            <span v-for="p in 11" :key="p" class="hm-header-cell">{{ p }}</span>
           </div>
-          <div v-for="p in 11" :key="p" class="heatmap-row">
-            <span class="hm-label">{{ p }}</span>
-            <span v-for="d in 7" :key="d"
+          <div v-for="d in 7" :key="d" class="heatmap-row">
+            <span class="hm-label">{{ weekdayNames[d - 1] }}</span>
+            <span v-for="p in 11" :key="p"
               class="hm-cell"
               :class="heatmapClass(d, p)"
               :title="heatmapTitle(d, p)">
@@ -414,7 +414,7 @@ async function doDrop(course) {
 .sidebar-content { margin-top: 8px; }
 
 .week-heatmap { font-size: 11px; }
-.heatmap-header, .heatmap-row { display: grid; grid-template-columns: 32px repeat(7, 1fr); gap: 1px; margin-bottom: 1px; }
+.heatmap-header, .heatmap-row { display: grid; grid-template-columns: 42px repeat(11, 1fr); gap: 1px; margin-bottom: 1px; }
 .hm-label { text-align: center; color: #909399; }
 .hm-header-cell { text-align: center; font-weight: 500; color: #606266; }
 .hm-cell {
