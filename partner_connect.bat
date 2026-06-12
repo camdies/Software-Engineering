@@ -1,95 +1,88 @@
 @echo off
 setlocal enabledelayedexpansion
-title 教务管理系统 - 伙伴连接配置工具
+title EduMgmt - Partner Connect Setup
 
-:: =================================================================
-:: 这个工具帮助开发伙伴配置连接你的服务器
-:: 放在项目根目录下运行
-:: =================================================================
 echo.
-echo   ╔══════════════════════════════════════════════════════╗
-echo   ║   高校教务管理系统 - 伙伴连接配置工具              ║
-echo   ╚══════════════════════════════════════════════════════╝
+echo   +--------------------------------------------------+
+echo   |  EduMgmt System - Partner Connection Setup       |
+echo   +--------------------------------------------------+
 echo.
-echo   此工具将帮你配置前端开发环境连接到服务器主机的后端 API。
+echo   This tool configures your frontend dev environment
+echo   to connect to the host's backend API.
 echo.
 
 set PROJECT_DIR=%~dp0
 cd /d "%PROJECT_DIR%"
 
 :: =================================================================
-:: Step 1: 获取主机 IP
+:: Step 1: Get host IP
 :: =================================================================
-echo [1/4] 输入服务器主机的 IP 地址
+echo [1/4] Enter the host server IP address
 echo.
-echo   请询问你的开发伙伴 (运行服务器的那个人) 他的 IP 地址。
-echo   伙伴可以在他的电脑上运行 server_control.bat 并选 [6] 查看。
+echo   Ask your partner (the person running the server) for their IP.
+echo   They can run server_control.bat and select [6] to see it.
 echo.
-set /p HOST_IP="请输入主机 IP (例如 192.168.1.100): "
+set /p HOST_IP="Host IP (e.g. 192.168.1.100): "
 if "%HOST_IP%"=="" (
-    echo   未输入 IP，使用默认 localhost
+    echo   No IP entered, using localhost
     set "HOST_IP=localhost"
 )
-echo   主机 IP: %HOST_IP%
+echo   Host IP: %HOST_IP%
 
 :: =================================================================
-:: Step 2: 配置前端 API 代理
+:: Step 2: Configure Vite proxy
 :: =================================================================
 echo.
-echo [2/4] 配置前端 API 代理指向主机...
+echo [2/4] Configuring frontend API proxy to point at host...
 
-:: Windows: 设置环境变量
-setx VITE_API_TARGET "http://%HOST_IP%:5000" >nul
-
-:: 同时写入 .env.local 文件 (Vite 会自动读取)
+:: Write .env.local for Vite
 echo VITE_API_TARGET=http://%HOST_IP%:5000 > frontend\.env.local
-echo   已配置: VITE_API_TARGET=http://%HOST_IP%:5000
+echo   Created: frontend\.env.local
+echo   VITE_API_TARGET=http://%HOST_IP%:5000
 
 :: =================================================================
-:: Step 3: 验证连通性
+:: Step 3: Verify connectivity
 :: =================================================================
 echo.
-echo [3/4] 验证与主机服务器的连通性...
+echo [3/4] Checking connectivity to host...
 ping -n 1 -w 2000 %HOST_IP% >nul 2>&1
 if %errorlevel% equ 0 (
-    echo   ping %HOST_IP% 成功 - 网络可达
+    echo   ping %HOST_IP% - OK, network reachable
 ) else (
-    echo   [警告] ping %HOST_IP% 失败 - 请确认在同一局域网
-    echo   如果主机和你在不同网络，需要使用内网穿透工具如 ngrok
+    echo   [WARNING] ping %HOST_IP% failed
+    echo   Make sure both computers are on the same LAN.
+    echo   If on different networks, use ngrok: ngrok http 5000
 )
 
 :: =================================================================
-:: Step 4: 显示连接信息
+:: Step 4: Summary
 :: =================================================================
 echo.
-echo [4/4] 配置完成!
+echo [4/4] Setup complete!
 echo.
-echo   ╔══════════════════════════════════════════════════════╗
-echo   ║  连接信息摘要                                      ║
-echo   ╠══════════════════════════════════════════════════════╣
-echo   ║                                                    ║
-echo   ║  方式一: 浏览器直接访问 (不需任何安装)            ║
-echo   ║    http://%HOST_IP%:5000                          ║
-echo   ║                                                    ║
-echo   ║  方式二: 前端开发模式 (可改前端代码)              ║
-echo   ║    cd frontend                                     ║
-echo   ║    npm run dev                                     ║
-echo   ║    打开 http://localhost:5173                      ║
-echo   ║    所有 API 自动代理到 http://%HOST_IP%:5000      ║
-echo   ║                                                    ║
-echo   ║  账号:                                            ║
-echo   ║    管理员 admin / 123456                          ║
-echo   ║    教师   T001  / 123456                          ║
-echo   ║    学生   STU001 / 123456                         ║
-echo   ╚══════════════════════════════════════════════════════╝
-echo.
-echo   现在输入 "npm run dev" 启动前端开发服务器即可!
+echo   +--------------------------------------------------+
+echo   |  Connection Summary                              |
+echo   +--------------------------------------------------+
+echo   |                                                  |
+echo   |  Option A: Browser (no install needed)           |
+echo   |    http://%HOST_IP%:5000                        |
+echo   |                                                  |
+echo   |  Option B: Frontend dev (hot reload)             |
+echo   |    cd frontend                                   |
+echo   |    npm run dev                                   |
+echo   |    Open http://localhost:5173                    |
+echo   |    All API calls proxy to host                   |
+echo   |                                                  |
+echo   |  Accounts:                                       |
+echo   |    admin  / 123456                               |
+echo   |    T001   / 123456  (teacher)                    |
+echo   |    STU001 / 123456  (student)                    |
+echo   +--------------------------------------------------+
 echo.
 
-:: 询问是否现在启动前端
-set /p START_NOW="是否现在启动前端开发服务器? (Y/N): "
+set /p START_NOW="Launch frontend dev server now? (Y/N): "
 if /i "!START_NOW!"=="Y" (
-    echo 正在启动 npm run dev ...
+    echo Starting npm run dev ...
     cd frontend
     call npm run dev
 )
