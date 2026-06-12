@@ -19,20 +19,33 @@ from flask import request, g
 from backend.api.response import error_response
 
 
-# 默认密钥（本地单进程部署足够；生产环境应配置固定密钥）
-_JWT_SECRET = os.urandom(32).hex()
+# 默认密钥 — 优先从 config.ini 读取，否则使用固定密钥避免
+# 每次进程重启 JWT 全部失效（Flask Debug 模式热重载会触发此问题）。
+# 如果 config.ini 中配置了 [web].jwt_secret，则使用配置的值；
+# 否则使用基于机器名的固定密钥（jwt 库要求至少 32 字符的 hex 串）。
+import hashlib
+import platform
+
+def _generate_stable_secret() -> str:
+    """生成稳定的默认 JWT 密钥。
+
+    若 config.ini 中配置了 [web].jwt_secret 则使用它；
+    否则基于主机名生成固定值，保证进程重启后 JWT 仍然有效。
+    """
+    try:
+        from backend.config.settings import Settings
+        configured = Settings.get_instance()._config.get("web", "jwt_secret", fallback="")
+        if configured.strip():
+            return configured.strip()
+    except Exception:
+        pass
+    # 回退：用主机名生成稳定密钥
+    raw = f"edu-mgmt-sys::{platform.node()}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+_JWT_SECRET = _generate_stable_secret()
 _JWT_ALGORITHM = "HS256"
 _JWT_EXPIRATION_HOURS = 24
-
-# 加载 config.ini 中配置的密钥（如果存在）
-try:
-    from backend.config.settings import Settings
-    _config = Settings.get_instance()._config
-    _configured_secret = _config.get("web", "jwt_secret", fallback="")
-    if _configured_secret.strip():
-        _JWT_SECRET = _configured_secret.strip()
-except Exception:
-    pass
 
 
 def create_token(user_id: str, role: str) -> str:

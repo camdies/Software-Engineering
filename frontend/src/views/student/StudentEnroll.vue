@@ -161,9 +161,9 @@
           </div>
         </div>
         <div class="heatmap-legend">
-          <span class="legend-item"><span class="legend-dot green"></span>空闲 (空余≥总周数)</span>
-          <span class="legend-item"><span class="legend-dot yellow"></span>部分 (空余≥总周数/2)</span>
-          <span class="legend-item"><span class="legend-dot red"></span>紧张 (空余&lt;总周数/2)</span>
+          <span class="legend-item"><span class="legend-dot green"></span>空余周数 = 总周数</span>
+          <span class="legend-item"><span class="legend-dot yellow"></span>空余周数 &ge; 总周数/2</span>
+          <span class="legend-item"><span class="legend-dot red"></span>空余周数 &lt; 总周数/2</span>
         </div>
 
         <!-- 已选课程列表 -->
@@ -291,13 +291,14 @@ function getWeekOccupancy(day, period) {
 
 function heatmapClass(day, period) {
   const free = TOTAL_WEEKS - getWeekOccupancy(day, period)
-  if (free >= TOTAL_WEEKS) return 'green'
+  if (free === TOTAL_WEEKS) return 'green'
   if (free >= TOTAL_WEEKS / 2) return 'yellow'
   return 'red'
 }
 
 function heatmapText(day, period) {
-  return TOTAL_WEEKS - getWeekOccupancy(day, period)
+  const free = TOTAL_WEEKS - getWeekOccupancy(day, period)
+  return free === TOTAL_WEEKS ? '空' : free
 }
 
 function heatmapTitle(day, period) {
