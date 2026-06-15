@@ -10,7 +10,6 @@ from sqlalchemy import (
     String,
     Integer,
     DECIMAL,
-    Enum as SAEnum,
     DateTime,
 )
 from sqlalchemy.orm import relationship
@@ -45,7 +44,7 @@ class Course(Base):
         comment="学时数",
     )
     exam_type = Column(
-        SAEnum("考试", "考查"),
+        String(10),
         comment="考核方式: 考试/考查",
     )
     department = Column(
