@@ -49,6 +49,10 @@ const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
+  // Access the store INSIDE the guard so Pinia is already installed.
+  // Calling useAuthStore() at module level causes the guard to run
+  // before app.use(pinia), producing a "getActivePinia()" error that
+  // silently swallows navigation and freezes the login page.
   const auth = useAuthStore()
 
   if (to.meta.public) {

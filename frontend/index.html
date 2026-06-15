@@ -6,7 +6,15 @@
   <title>高校教务管理系统</title>
 </head>
 <body>
-  <div id="app"></div>
+  <div id="app">
+    <!-- Inline loading indicator shown BEFORE Vue mounts.
+         If the page sits here for more than 2 seconds, the problem
+         is a JS error during app initialization (check browser
+         console with F12). -->
+    <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#909399">
+      Loading...
+    </div>
+  </div>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
