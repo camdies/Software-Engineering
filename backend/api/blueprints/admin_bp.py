@@ -80,6 +80,7 @@ def create_student():
 @require_role("admin")
 def update_student(student_id):
     data = request.get_json(silent=True) or {}
+    data.pop("student_id", None)
     result = AdminController().update_student(student_id, **data)
     if result.get("success"):
         return success_response(message=result["message"])
@@ -138,6 +139,7 @@ def create_teacher():
 @require_role("admin")
 def update_teacher(teacher_id):
     data = request.get_json(silent=True) or {}
+    data.pop("teacher_id", None)
     result = AdminController().update_teacher(teacher_id, **data)
     if result.get("success"):
         return success_response(message=result["message"])
@@ -200,6 +202,7 @@ def create_course():
 @require_role("admin")
 def update_course(course_id):
     data = request.get_json(silent=True) or {}
+    data.pop("course_id", None)
     result = AdminController().update_course(course_id, **data)
     if result.get("success"):
         return success_response(message=result["message"])
