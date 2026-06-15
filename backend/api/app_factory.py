@@ -62,6 +62,10 @@ def create_app() -> Flask:
 
     @app.errorhandler(500)
     def handle_500(e):
+        import traceback
+        from backend.utils.log_util import get_logger
+        _log = get_logger("app_factory")
+        _log.error(f"500 Internal Server Error: {e}\n{traceback.format_exc()}")
         return error_response("服务器内部错误", status_code=500)
 
     # ── 生产模式：服务 Vue 前端静态文件 ──
@@ -74,7 +78,8 @@ def create_app() -> Flask:
             return
         try:
             from backend.models.base import DatabaseManager
-            DatabaseManager.get_instance()
+            db = DatabaseManager.get_instance()
+            db.create_all_tables()
             app._db_ready = True
         except Exception:
             pass
