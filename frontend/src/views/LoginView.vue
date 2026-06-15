@@ -59,14 +59,14 @@ const rules = {
 }
 
 async function submit() {
-  const valid = await formRef.value?.validate().catch(() => false)
+  const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
   loading.value = true
   try {
     const res = await auth.login(form.user_id, form.password)
     if (!res || !res.success) {
-      // login() returns the response; if backend said "fail",
-      // the interceptor already showed ElMessage.error.
+      // Backend returned an error — interceptor already showed ElMessage.
+      // Don't navigate, just let the user try again.
       return
     }
     if (auth.isAdmin) router.push('/admin/students')
