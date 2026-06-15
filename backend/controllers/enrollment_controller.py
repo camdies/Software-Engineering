@@ -77,15 +77,28 @@ class EnrollmentController:
                             "message": "课程不存在或未开放选课"}
 
                 # --- 校验2: 重复选课校验 ---
+                # Check ANY existing enrollment (both "已选" and "已退") because
+                # the DB has a UNIQUE(student_id, plan_id) constraint.  If the
+                # student previously dropped this course, reactivate the old
+                # row instead of trying to INSERT a duplicate.
                 existing = session.query(Enrollment).filter_by(
-                    student_id=student_id, plan_id=plan_id, status="已选"
+                    student_id=student_id, plan_id=plan_id
                 ).first()
                 if existing:
+                    if existing.status == "已选":
+                        self._write_log(session, student_id, "选课",
+                                        f"重复选课: plan_id={plan_id}", "失败", "")
+                        logger.info(f"学生{student_id}重复选课plan_id={plan_id}")
+                        return {"success": False,
+                                "message": "您已选择该课程，请勿重复提交"}
+                    # Previously dropped — reactivate
+                    existing.status = "已选"
+                    existing.enroll_time = datetime.now()
+                    plan.enrolled = (plan.enrolled or 0) + 1
                     self._write_log(session, student_id, "选课",
-                                    f"重复选课: plan_id={plan_id}", "失败", "")
-                    logger.info(f"学生{student_id}重复选课plan_id={plan_id}")
-                    return {"success": False,
-                            "message": "您已选择该课程，请勿重复提交"}
+                                    f"重新选课成功: plan_id={plan_id}", "成功", "")
+                    logger.info(f"学生{student_id}重新选课: plan_id={plan_id}")
+                    return {"success": True, "message": "选课成功！"}
 
                 # --- 校验3: 时间冲突校验 ---
                 conflict_result = self._check_time_conflict(
