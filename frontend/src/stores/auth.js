@@ -22,6 +22,9 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('token', d.token)
       localStorage.setItem('role', d.role)
       localStorage.setItem('user_id', d.user_id)
+    } else {
+      // Propagate failure so the caller can reset loading state
+      throw new Error(res.message || 'Login failed')
     }
     return res
   }
