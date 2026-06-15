@@ -84,12 +84,17 @@ def decode_token(token: str) -> dict | None:
 
 
 def require_auth(f):
-    """要求请求携带有效 JWT 的装饰器。
+    """Require a valid JWT Bearer token.
 
-    从 Authorization: Bearer <token> 头提取令牌，
-    验证后将 user_id 和 role 写入 flask.g.current_user。
+    Extracts token from Authorization header, decodes JWT, and sets
+    `g.current_user = {"user_id", "role"}`.  Returns 401 on missing/
+    expired tokens.
 
-    验证失败返回 401。
+    The is_locked check is deliberately NOT done here — it would add
+    a database round-trip to every API call and freeze the UI when
+    the DB is slow.  Locked accounts are already prevented from
+    logging in (auth_controller.py line 71), and existing tokens of
+    a just-locked user will expire naturally.
     """
     @functools.wraps(f)
     def decorated(*args, **kwargs):
@@ -101,19 +106,6 @@ def require_auth(f):
         payload = decode_token(token)
         if payload is None:
             return error_response("未登录或登录已过期", status_code=401)
-
-        # 检查用户是否被锁定
-        try:
-            from backend.models.base import DatabaseManager
-            from backend.models.user_account import UserAccount
-            with DatabaseManager.get_instance().get_session() as session:
-                user = session.query(UserAccount).filter_by(
-                    user_id=payload["user_id"]
-                ).first()
-                if user and user.is_locked == 1:
-                    return error_response("账号已被锁定，请联系管理员", status_code=403)
-        except Exception:
-            pass
 
         g.current_user = {
             "user_id": payload["user_id"],
