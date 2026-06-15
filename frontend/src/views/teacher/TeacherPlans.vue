@@ -130,7 +130,7 @@ const filteredPlans = computed(() => {
 onMounted(async () => {
   const [pRes, cRes] = await Promise.all([
     request.get('/teacher/plans'),
-    request.get('/admin/courses', { params: { page_size: 200 } }),
+    request.get('/teacher/courses', { params: { page_size: 200 } }),
   ])
   plans.value = pRes.data?.items || []
   allCourses.value = cRes.data?.data || []
@@ -182,6 +182,12 @@ async function save() {
 
 async function stopCourse(planId) {
   try { await ElMessageBox.confirm('确认停课？', '停课确认', { type: 'warning' }) } catch { return }
-  // TODO: add stop course API
+  try {
+    await request.put(`/teacher/course-plan/${planId}`, { status: '已停课' })
+    ElMessage.success('课程已停课')
+    fetchData()
+  } catch (e) {
+    ElMessage.error('操作失败')
+  }
 }
 </script>

@@ -104,9 +104,24 @@ function getCoursesAt(day, period) {
 
 function blockStyle(course) {
   const h = (course.period_count || 2) * 48
+  // Use a deterministic palette: each plan_id maps to a distinct color
+  const palette = [
+    { bg: '#dbeafe', border: '#3b82f6' }, // blue
+    { bg: '#dcfce7', border: '#22c55e' }, // green
+    { bg: '#fef3c7', border: '#f59e0b' }, // amber
+    { bg: '#fce7f3', border: '#ec4899' }, // pink
+    { bg: '#e0e7ff', border: '#6366f1' }, // indigo
+    { bg: '#ccfbf1', border: '#14b8a6' }, // teal
+    { bg: '#fef2f2', border: '#ef4444' }, // red
+    { bg: '#f3e8ff', border: '#a855f7' }, // purple
+    { bg: '#fff7ed', border: '#f97316' }, // orange
+    { bg: '#ecfeff', border: '#06b6d4' }, // cyan
+  ]
+  const idx = (course.plan_id || 0) % palette.length
   return {
     height: `${h}px`,
-    background: `hsl(${(parseInt(course.course_id?.replace(/\D/g, '') || '0') % 360)}, 70%, 85%)`,
+    background: palette[idx].bg,
+    borderLeft: `3px solid ${palette[idx].border}`,
   }
 }
 
@@ -123,12 +138,16 @@ async function exportExcel() {
     a.click()
     URL.revokeObjectURL(url)
   } catch {
-    // Fallback: build HTML table
+    const periodTimesLocal = [
+      '08:30-09:10', '09:20-10:00', '10:20-11:00', '11:10-11:50',
+      '14:30-15:10', '15:20-16:00', '16:10-16:50', '17:00-17:40',
+      '19:00-19:40', '19:50-20:30', '20:40-21:20',
+    ]
     let html = '<html><head><meta charset="utf-8"><title>个人课表</title></head><body>'
     html += '<h2>个人课表</h2><table border="1" cellpadding="4" cellspacing="0">'
     html += '<tr><th>节次/时间</th>' + weekdayNames.map(w => `<th>${w}</th>`).join('') + '</tr>'
     for (let p = 1; p <= 11; p++) {
-      html += `<tr><td>第${p}节<br/>${periodTimes[p - 1]}</td>`
+      html += `<tr><td>第${p}节<br/>${periodTimesLocal[p - 1]}</td>`
       for (let d = 1; d <= 7; d++) {
         const courses = getCoursesAt(d, p)
         html += `<td>${courses.map(c => `${c.course_name}<br/>${c.location || ''}<br/>${c.start_week}-${c.end_week}周`).join('<br/>') || ''}</td>`
@@ -142,6 +161,11 @@ async function exportExcel() {
 }
 
 function exportPDF() {
+  const periodTimesLocal = [
+    '08:30-09:10', '09:20-10:00', '10:20-11:00', '11:10-11:50',
+    '14:30-15:10', '15:20-16:00', '16:10-16:50', '17:00-17:40',
+    '19:00-19:40', '19:50-20:30', '20:40-21:20',
+  ]
   const w = window.open('', '_blank')
   w.document.write(`
     <html><head><meta charset="utf-8"><title>个人课表</title>
@@ -161,7 +185,7 @@ function exportPDF() {
   w.document.write('<table>')
   w.document.write(`<tr><th class="time-col">节次/时间</th>${weekdayNames.map(n => `<th>${n}</th>`).join('')}</tr>`)
   for (let p = 1; p <= 11; p++) {
-    w.document.write(`<tr><td class="time-col">第${p}节<br/><small>${periodTimes[p - 1]}</small></td>`)
+    w.document.write(`<tr><td class="time-col">第${p}节<br/><small>${periodTimesLocal[p - 1]}</small></td>`)
     for (let d = 1; d <= 7; d++) {
       const courses = getCoursesAt(d, p)
       const cells = courses.map(c => `${c.course_name}<br/>${c.location || ''}`).join('<br/>') || ''
