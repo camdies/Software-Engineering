@@ -67,27 +67,17 @@ def create_app() -> Flask:
     # ── 生产模式：服务 Vue 前端静态文件 ──
     _setup_static_serving(app)
 
-    # ── 初始化数据库（延迟到首次请求，避免启动时阻塞）──
+    # ── 初始化数据库（延迟到首次请求）──
     @app.before_request
-    def _lazy_init_db():
-        """Lazy-init the database on the first request.
-
-        Doing it here instead of at import time prevents create_app() from
-        hanging for 30+ seconds (or crashing) when the database is
-        unreachable.  A cold start just shows a 500 on the *first* API
-        call instead of refusing to start at all.
-        """
-        if getattr(app, '_db_initialized', False):
+    def _init_db_on_first_request():
+        if getattr(app, '_db_ready', False):
             return
-        app._db_initialized = True
         try:
             from backend.models.base import DatabaseManager
             DatabaseManager.get_instance()
-        except Exception as exc:
-            import logging
-            logging.getLogger("app_factory").error(
-                f"Database init failed: {exc}", exc_info=True
-            )
+            app._db_ready = True
+        except Exception:
+            pass
 
     return app
 

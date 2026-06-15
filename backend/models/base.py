@@ -96,7 +96,8 @@ class DatabaseManager:
             # pyodbc 额外参数
             if self._driver == "mssql" and "pyodbc" in db_url:
                 connect_args = {
-                    "timeout": 30,
+                    "timeout": 5,
+                    "login_timeout": 5,
                 }
 
             self._engine = create_engine(
@@ -104,7 +105,7 @@ class DatabaseManager:
                 poolclass=QueuePool,
                 pool_size=db.get("pool_size", 10),
                 max_overflow=20,
-                pool_timeout=30,
+                pool_timeout=10,
                 pool_pre_ping=True,
                 echo=False,
                 connect_args=connect_args if connect_args else {},
