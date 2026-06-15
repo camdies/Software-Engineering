@@ -59,16 +59,24 @@ const rules = {
 }
 
 async function submit() {
-  const valid = await formRef.value.validate().catch(() => false)
+  const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
   loading.value = true
   try {
-    await auth.login(form.user_id, form.password)
+    const res = await auth.login(form.user_id, form.password)
+    if (!res || !res.success) {
+      // login() returns the response; if backend said "fail",
+      // the interceptor already showed ElMessage.error.
+      return
+    }
     if (auth.isAdmin) router.push('/admin/students')
     else if (auth.isTeacher) router.push('/teacher/plans')
     else router.push('/student/enroll')
-  } catch (_) { /* interceptor handles */ }
-  finally { loading.value = false }
+  } catch (_) {
+    // network error — interceptor already showed ElMessage.error
+  } finally {
+    loading.value = false
+  }
 }
 
 // ── 忘记密码 ──
