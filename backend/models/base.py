@@ -97,7 +97,6 @@ class DatabaseManager:
             if self._driver == "mssql" and "pyodbc" in db_url:
                 connect_args = {
                     "timeout": 30,
-                    "autocommit": False,
                 }
 
             self._engine = create_engine(

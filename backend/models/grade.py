@@ -65,7 +65,7 @@ class Grade(Base):
         comment="成绩录入时间",
     )
     status = Column(
-        SAEnum("正常", "待审核", "已更正"),
+        String(10),
         default="正常",
         comment="成绩状态: 正常/待审核/已更正",
     )
