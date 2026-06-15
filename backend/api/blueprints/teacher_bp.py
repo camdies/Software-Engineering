@@ -41,6 +41,23 @@ def get_enrolled_students(plan_id):
     return success_response({"items": result})
 
 
+@teacher_bp.route("/courses", methods=["GET"])
+@require_auth
+@require_role("teacher")
+def get_teacher_course_list():
+    """教师端获取可用课程列表（用于授课计划申请时的课程搜索）。
+
+    不限制 role=admin，教师也需要能搜索课程。
+    """
+    page = request.args.get("page", 1, type=int)
+    page_size = request.args.get("page_size", 200, type=int)
+    course_id = request.args.get("course_id")
+    course_name = request.args.get("course_name")
+    from backend.controllers.admin_controller import AdminController
+    result = AdminController().get_courses(page, page_size, course_id, course_name)
+    return success_response(result)
+
+
 @teacher_bp.route("/grades", methods=["GET"])
 @require_auth
 @require_role("teacher")
@@ -132,7 +149,7 @@ def update_course_plan(plan_id):
         if plan.status != "待审核":
             return error_response("仅可修改待审核状态的申请")
 
-        for key in ("weekday", "period_start", "period_count", "start_week", "end_week", "location", "capacity", "prerequisite", "apply_reason"):
+        for key in ("weekday", "period_start", "period_count", "start_week", "end_week", "location", "capacity", "prerequisite", "apply_reason", "status"):
             if key in data:
                 setattr(plan, key, data[key])
 
