@@ -12,7 +12,7 @@ const API_BASE = (typeof __API_BASE__ !== 'undefined') ? __API_BASE__ : '/api'
 
 const request = axios.create({
   baseURL: API_BASE,
-  timeout: 15000,
+  timeout: 10000,
 })
 
 // Request interceptor: attach JWT token
