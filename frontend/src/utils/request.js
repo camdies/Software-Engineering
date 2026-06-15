@@ -45,7 +45,11 @@ request.interceptors.response.use(
         localStorage.removeItem('token')
         localStorage.removeItem('role')
         localStorage.removeItem('user_id')
-        window.location.href = '/login'
+        // Use a small delay so ElMessage has time to render before
+        // the hard redirect tears down the Vue app.  The setTimeout
+        // also prevents rapid redirect loops when multiple parallel
+        // requests all get 401 at the same time.
+        setTimeout(() => { window.location.href = '/login' }, 300)
       } else if (status === 403) {
         ElMessage.error(msg || 'Permission denied')
       } else {
