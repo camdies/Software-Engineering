@@ -10,7 +10,6 @@ from sqlalchemy import (
     Integer,
     String,
     Index,
-    Enum as SAEnum,
     DateTime,
     ForeignKey,
 )
@@ -55,7 +54,7 @@ class Enrollment(Base):
         comment="选课时间",
     )
     status = Column(
-        SAEnum("已选", "已退"),
+        String(10),
         default="已选",
         comment="选课状态: 已选/已退",
     )

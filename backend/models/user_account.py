@@ -39,7 +39,7 @@ class UserAccount(Base):
         comment="bcrypt密码哈希",
     )
     role = Column(
-        SAEnum("admin", "teacher", "student"),
+        String(10),
         nullable=False,
         comment="用户角色: admin/teacher/student",
     )

@@ -105,7 +105,7 @@ class CoursePlan(Base):
         comment="教师申请理由",
     )
     status = Column(
-        SAEnum("待审核", "已通过", "已驳回", "已停课"),
+        String(10),
         default="待审核",
         comment="审核状态: 待审核/已通过/已驳回/已停课",
     )

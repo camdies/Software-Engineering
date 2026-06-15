@@ -144,11 +144,18 @@ class AdminController:
                     student_id=student_id).first()
                 if student is None:
                     return {"success": False, "message": "学生不存在"}
-                session.delete(student)
+
+                # Delete UserAccount FIRST (parent), then Student (child).
+                # Student FK -> user_account is ON DELETE CASCADE, but
+                # explicit order prevents double-delete contention on MSSQL.
                 account = session.query(UserAccount).filter_by(
                     user_id=student_id).first()
                 if account:
                     session.delete(account)
+                    session.flush()
+                # Now delete student (any remaining references)
+                session.delete(student)
+
                 self._write_log(session, "admin", "系统",
                                 f"删除学生: {student_id}", "成功", "")
                 return {"success": True, "message": "学生删除成功"}
@@ -263,11 +270,15 @@ class AdminController:
                     teacher_id=teacher_id).first()
                 if teacher is None:
                     return {"success": False, "message": "教师不存在"}
-                session.delete(teacher)
+
+                # Delete UserAccount FIRST (parent), then Teacher (child)
                 account = session.query(UserAccount).filter_by(
                     user_id=teacher_id).first()
                 if account:
                     session.delete(account)
+                    session.flush()
+                session.delete(teacher)
+
                 self._write_log(session, "admin", "系统",
                                 f"删除教师: {teacher_id}", "成功", "")
                 return {"success": True, "message": "教师删除成功"}
@@ -418,8 +429,7 @@ class AdminController:
         """
         try:
             with self._db.get_session() as session:
-                query = session.query(OperationLog).order_by(
-                    OperationLog.log_time.desc())
+                query = session.query(OperationLog)
                 if user_id:
                     query = query.filter(
                         OperationLog.user_id.like(f"%{user_id}%"))
@@ -428,7 +438,7 @@ class AdminController:
                         OperationLog.log_type == log_type)
                 total = query.count()
                 offset = (page - 1) * page_size
-                logs = query.order_by(OperationLog.log_id).offset(offset).limit(page_size).all()
+                logs = query.order_by(OperationLog.log_time.desc()).offset(offset).limit(page_size).all()
                 return {
                     "total": total,
                     "page": page,
