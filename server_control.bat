@@ -83,7 +83,15 @@ set "AUTO_INI=%MYSQL_DIR%\my.ini.auto"
     )
 )
 echo Starting MySQL in foreground window...
-start "EduMgmt MySQL" /MIN cmd /c "cd /d \"%MYSQL_DIR%\" && \"%MYSQL_DIR%\bin\mysqld.exe\" --defaults-file=\"%AUTO_INI%\" --console"
+:: Write temp launcher bat to avoid nested-quote hell
+> "%MYSQL_DIR%\_run_mysql.bat" (
+    echo @echo off
+    echo chcp 65001 ^>nul
+    echo cd /d "%MYSQL_DIR%"
+    echo start "EduMgmt MySQL" /MIN "%MYSQL_DIR%\bin\mysqld.exe" --defaults-file="%AUTO_INI%" --console
+)
+call "%MYSQL_DIR%\_run_mysql.bat"
+del "%MYSQL_DIR%\_run_mysql.bat" 2>nul
 popd
 
 echo Waiting for MySQL...
