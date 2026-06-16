@@ -176,8 +176,14 @@ class AdminController:
                 ip_address=ip_address,
             )
             session.add(log_entry)
-        except Exception as e:
-            logger.warning(f"操作日志写入失败: {e}")
+            session.flush()
+        except Exception:
+            try:
+                session.rollback()
+                session.expunge(log_entry)
+            except Exception:
+                pass
+            logger.warning(f"操作日志写入失败（已跳过）: user={user_id} {operation}")
 
     # ----- Teacher management -----
 
