@@ -149,8 +149,8 @@ default-character-set=utf8mb4
 ```powershell
 cd "D:\C++\VisualStudio study\Software Engineering\mysql-portable"
 
-# 初始化数据目录（生成 root 随机密码）
-.\bin\mysqld.exe --defaults-file="%CD%\my.ini" --initialize-insecure --console
+# 初始化数据目录（生成 root 空密码）
+.\bin\mysqld.exe --defaults-file="$PWD\my.ini" --initialize-insecure --console
 ```
 
 > `--initialize-insecure` 表示 root 无初始密码。查看控制台输出确认初始化成功。
@@ -161,10 +161,10 @@ cd "D:\C++\VisualStudio study\Software Engineering\mysql-portable"
 cd "D:\C++\VisualStudio study\Software Engineering\mysql-portable"
 
 # 前台启动（调试用，Ctrl+C 停止）
-.\bin\mysqld.exe --defaults-file="%CD%\my.ini" --console
+.\bin\mysqld.exe --defaults-file="$PWD\my.ini" --console
 
 # 后台启动（安装为 Windows 服务）
-.\bin\mysqld.exe --install MySQL-EduMgmt --defaults-file="%CD%\my.ini"
+.\bin\mysqld.exe --install MySQL-EduMgmt --defaults-file="$PWD\my.ini"
 net start MySQL-EduMgmt
 ```
 
@@ -189,8 +189,11 @@ EXIT;
 ```powershell
 cd "D:\C++\VisualStudio study\Software Engineering"
 
-# 用项目提供的 DDL 脚本初始化
-.\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 < backend\config\init_database_mysql.sql
+# PowerShell 方法（推荐）
+Get-Content backend\config\init_database_mysql.sql -Encoding UTF8 | .\mysql-portable\bin\mysql.exe -u root -pCairenbin2005
+
+# 或者用 CMD 重定向
+cmd /c ".\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 < backend\config\init_database_mysql.sql"
 ```
 
 验证：
@@ -235,7 +238,7 @@ python run.py
 cd "D:\C++\VisualStudio study\Software Engineering\mysql-portable"
 
 # 安装服务
-.\bin\mysqld.exe --install MySQL-EduMgmt --defaults-file="%CD%\my.ini"
+.\bin\mysqld.exe --install MySQL-EduMgmt --defaults-file="$PWD\my.ini"
 
 # 启动服务
 net start MySQL-EduMgmt
@@ -273,18 +276,18 @@ cd "D:\C++\VisualStudio study\Software Engineering\mysql-portable"
 ### 数据备份
 
 ```powershell
-# 导出
-.\mysql-portable\bin\mysqldump.exe -u root -pCairenbin2005 course_management_db > backup_%date:~0,10%.sql
+# PowerShell 导出
+.\mysql-portable\bin\mysqldump.exe -u root -pCairenbin2005 course_management_db | Out-File -Encoding UTF8 backup.sql
 
 # 导入恢复
-.\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 course_management_db < backup_xxx.sql
+Get-Content backup.sql -Encoding UTF8 | .\mysql-portable\bin\mysql.exe -u root -pCairenbin2005
 ```
 
 ### 完全重置数据库
 
 ```powershell
-.\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 -e "DROP DATABASE IF EXISTS course_management_db;"
-.\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 < backend\config\init_database_mysql.sql
+.\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 -e "DROP DATABASE IF EXISTS course_management_db; CREATE DATABASE course_management_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+Get-Content backend\config\init_database_mysql.sql -Encoding UTF8 | .\mysql-portable\bin\mysql.exe -u root -pCairenbin2005
 ```
 
 ---
@@ -301,7 +304,7 @@ cd "D:\C++\VisualStudio study\Software Engineering\mysql-portable"
 ```powershell
 # 伙伴拿到项目后执行
 cd "D:\...\Software Engineering\mysql-portable"
-.\bin\mysqld.exe --install MySQL-EduMgmt --defaults-file="%CD%\my.ini"
+.\bin\mysqld.exe --install MySQL-EduMgmt --defaults-file="$PWD\my.ini"
 net start MySQL-EduMgmt
 
 cd ..

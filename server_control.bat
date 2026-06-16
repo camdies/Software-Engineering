@@ -48,6 +48,10 @@ echo   ---- Partner Tools ----
 echo   [6] Partner connection info
 echo   [7] Package and distribute for partner
 echo.
+echo   ---- Database ----
+echo   [D] Start MySQL (embedded)
+echo   [E] Stop MySQL (embedded)
+echo.
 echo   [R] Return to this menu
 echo   [0] Exit
 echo --------------------------------------------------
@@ -64,6 +68,8 @@ if "%CHOICE%"=="6" goto :partner_info
 if "%CHOICE%"=="7" goto :distribute
 if /i "%CHOICE%"=="A" goto :ipv6_guide
 if /i "%CHOICE%"=="B" goto :ext_access_guide
+if /i "%CHOICE%"=="D" goto :mysql_start
+if /i "%CHOICE%"=="E" goto :mysql_stop
 if /i "%CHOICE%"=="R" goto :menu
 if "%CHOICE%"=="0" goto :end
 echo Invalid option, try again...
@@ -71,8 +77,112 @@ pause
 goto :menu
 
 :: =================================================================
+:ensure_mysql
+:: =================================================================
+:: Check if MySQL is running and prompt to start it if not.
+sc query MySQL-EduMgmt 2>nul | findstr "RUNNING" >nul && goto :mysql_ok
+sc query MySQL80 2>nul | findstr "RUNNING" >nul && goto :mysql_ok
+sc query MariaDB 2>nul | findstr "RUNNING" >nul && goto :mysql_ok
+
+echo.
+echo   [WARNING] MySQL is NOT running!
+echo.
+echo   The server needs MySQL to function. Choose:
+echo     [Y] Start embedded MySQL (MySQL-EduMgmt service)
+echo     [N] Skip (MySQL is on another machine or already started manually)
+echo.
+set /p MYSQL_CHOICE="Start MySQL? (Y/N): "
+if /i "!MYSQL_CHOICE!"=="Y" (
+    call :mysql_start
+) else (
+    echo   Skipping MySQL check. Make sure your database is reachable.
+    timeout /t 2 >nul
+)
+:mysql_ok
+exit /b
+
+:: =================================================================
+:mysql_start
+:: =================================================================
+cls
+echo.
+echo   ---- Starting MySQL ----
+
+:: Try embedded MySQL-EduMgmt service first
+sc query MySQL-EduMgmt 2>nul >nul
+if %errorlevel% equ 0 (
+    net start MySQL-EduMgmt 2>nul
+    if %errorlevel% equ 0 (
+        echo   MySQL-EduMgmt service started.
+        goto :mysql_done
+    )
+    echo   MySQL-EduMgmt service exists but failed to start.
+)
+
+:: Try MySQL80
+sc query MySQL80 2>nul >nul
+if %errorlevel% equ 0 (
+    net start MySQL80 2>nul
+    if %errorlevel% equ 0 (
+        echo   MySQL80 service started.
+        goto :mysql_done
+    )
+    echo   MySQL80 service exists but failed to start.
+)
+
+:: Try MariaDB
+sc query MariaDB 2>nul >nul
+if %errorlevel% equ 0 (
+    net start MariaDB 2>nul
+    if %errorlevel% equ 0 (
+        echo   MariaDB service started.
+        goto :mysql_done
+    )
+)
+
+:: No MySQL service found, try installing from mysql-portable if present
+if exist "%PROJECT_DIR%mysql-portable\bin\mysqld.exe" (
+    echo   No MySQL service found. Installing from mysql-portable...
+    cd /d "%PROJECT_DIR%mysql-portable"
+    for %%I in ("%CD%") do set "MYSQL_DIR=%%~sI"
+    .\bin\mysqld.exe --install MySQL-EduMgmt --defaults-file="%MYSQL_DIR%\my.ini" 2>nul
+    net start MySQL-EduMgmt 2>nul
+    if %errorlevel% equ 0 (
+        echo   MySQL-EduMgmt installed and started from mysql-portable.
+        cd /d "%PROJECT_DIR%"
+        goto :mysql_done
+    )
+    echo   Failed to install MySQL-EduMgmt. Check mysql-portable\my.ini configuration.
+    cd /d "%PROJECT_DIR%"
+) else (
+    echo   mysql-portable not found. Please install MySQL manually.
+    echo   See MYSQL_SETUP_GUIDE.md for instructions.
+)
+
+:mysql_done
+echo.
+echo   Press R then Enter to return to menu.
+set /p X=""
+goto :menu
+
+:: =================================================================
+:mysql_stop
+:: =================================================================
+cls
+echo.
+echo   ---- Stopping MySQL ----
+net stop MySQL-EduMgmt 2>nul && echo   MySQL-EduMgmt stopped.
+net stop MySQL80 2>nul && echo   MySQL80 stopped.
+net stop MariaDB 2>nul && echo   MariaDB stopped.
+echo.
+echo   Press R then Enter to return to menu.
+set /p X=""
+goto :menu
+
+:: =================================================================
 :start_local
 :: =================================================================
+call :ensure_mysql
 start "EduMgmt Flask [localhost]" python run.py
 echo.
 echo   Server starting at http://localhost:5000
@@ -84,6 +194,7 @@ goto :menu
 :: =================================================================
 :start_public
 :: =================================================================
+call :ensure_mysql
 echo.
 echo   Starting server in PUBLIC mode (LAN + IPv6)...
 echo.
@@ -157,9 +268,11 @@ if %errorlevel% equ 0 (echo   Port 5000 TCP: OPEN) else (echo   Port 5000 TCP: N
 
 echo.
 echo   ---- Database ----
+sc query MySQL-EduMgmt 2>nul | findstr "RUNNING" >nul && echo   MySQL-EduMgmt (embedded): RUNNING
 sc query MySQL80 2>nul | findstr "RUNNING" >nul && echo   MySQL 8.0: RUNNING
 sc query MariaDB 2>nul | findstr "RUNNING" >nul && echo   MariaDB: RUNNING
-sc query MySQL80 2>nul | findstr "STOPPED" >nul && echo   MySQL: STOPPED
+sc query MySQL-EduMgmt 2>nul | findstr "STOPPED" >nul && echo   MySQL-EduMgmt: STOPPED
+sc query MySQL80 2>nul | findstr "STOPPED" >nul && echo   MySQL 8.0: STOPPED
 sc query MariaDB 2>nul | findstr "STOPPED" >nul && echo   MariaDB: STOPPED
 sc query MSSQL$SQLEXPRESS 2>nul | findstr "RUNNING" >nul && echo   SQL Server (SQLEXPRESS): RUNNING
 sc query MSSQLSERVER 2>nul | findstr "RUNNING" >nul && echo   SQL Server (MSSQLSERVER): RUNNING
@@ -180,6 +293,7 @@ goto :menu
 :: =================================================================
 :rebuild
 :: =================================================================
+call :ensure_mysql
 echo.
 echo   Building frontend...
 cd frontend
@@ -236,14 +350,14 @@ goto :menu
 :distribute
 :: =================================================================
 echo.
-echo   Packaging project (excludes node_modules, .git, __pycache__)...
+echo   Packaging project (excludes node_modules, .git, __pycache__, mysql-portable)...
 set "PACKAGE_NAME=edu-mgmt-dist.zip"
 set "PACKAGE_DIR=%PROJECT_DIR%..\edu-mgmt-dist"
 
 if exist "%PACKAGE_DIR%" rmdir /s /q "%PACKAGE_DIR%"
 mkdir "%PACKAGE_DIR%"
 
-robocopy "%PROJECT_DIR%" "%PACKAGE_DIR%" /E /NFL /NDL /NJH /NJS /XD node_modules __pycache__ .git .claude .vscode .idea /XF *.pyc *.bak .env >nul
+robocopy "%PROJECT_DIR%" "%PACKAGE_DIR%" /E /NFL /NDL /NJH /NJS /XD node_modules __pycache__ .git .claude .vscode .idea mysql-portable /XF *.pyc *.bak .env >nul
 if %errorlevel% geq 8 echo   Warning: some copy errors, continuing...
 
 if exist "%PACKAGE_DIR%\backend\config\config.ini" del "%PACKAGE_DIR%\backend\config\config.ini"
@@ -259,8 +373,9 @@ echo   Package: %PROJECT_DIR%..\%PACKAGE_NAME%
 echo.
 echo   Partner steps:
 echo   1. Extract zip
-echo   2. Run: partner_connect.bat
-echo   3. Choose [2] IPv6 or [1] LAN
+echo   2. Install MySQL (see MYSQL_SETUP_GUIDE.md)
+echo   3. Run: partner_connect.bat
+echo   4. Choose [2] IPv6 or [1] LAN
 echo.
 echo   Press R then Enter to return to menu.
 set /p X=""
@@ -391,6 +506,7 @@ goto :menu
 :: =================================================================
 :start_external
 :: =================================================================
+call :ensure_mysql
 echo.
 echo   Starting server for EXTERNAL ACCESS...
 echo.
