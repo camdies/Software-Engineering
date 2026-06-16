@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 >nul
 setlocal enabledelayedexpansion
 title EduMgmt Server Control Panel
 cd /d "%~dp0"
@@ -54,10 +53,10 @@ echo Unknown option.
 pause
 goto :menu
 
-:: =================================================================
+:: ─── MySQL Foreground (no admin) ───
 :mysql_foreground
 cls
-echo === MySQL Start (Foreground, No Admin) ===
+echo === MySQL Start (Foreground) ===
 echo.
 if not exist "mysql-portable\bin\mysqld.exe" (
     echo mysql-portable\ not found.
@@ -75,6 +74,47 @@ if %errorlevel% equ 0 (
 pushd mysql-portable
 set "MYSQL_DIR=%CD%"
 set "AUTO_INI=%MYSQL_DIR%\my.ini.auto"
+
+:: First-time init if data/ missing
+if not exist "data\" (
+    echo Data directory not found. Running first-time init...
+    echo.
+    mkdir data
+    .\bin\mysqld.exe --defaults-file="%AUTO_INI%" --initialize-insecure --console
+    if %errorlevel% neq 0 (
+        echo [ERROR] MySQL init failed.
+        pause
+        popd
+        goto :menu
+    )
+    echo Init OK. Importing database...
+    start "EduMgmt MySQL Init" /MIN .\bin\mysqld.exe --defaults-file="%AUTO_INI%" --console
+    set "AT=0"
+    :wait_init_fg
+    timeout /t 1 /nobreak >nul
+    set /a AT+=1
+    .\bin\mysql.exe -u root --protocol=TCP -e "SELECT 1;" 2>nul | findstr "1" >nul
+    if !AT! geq 30 (
+        echo [ERROR] MySQL failed to start.
+        taskkill /FI "WINDOWTITLE eq EduMgmt MySQL Init" /F 2>nul
+        pause
+        popd
+        goto :menu
+    )
+    .\bin\mysql.exe -u root --protocol=TCP -e "SELECT 1;" 2>nul | findstr "1" >nul || goto :wait_init_fg
+    .\bin\mysql.exe -u root --protocol=TCP -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'Cairenbin2005'; FLUSH PRIVILEGES;" 2>nul
+    chcp 65001 >nul
+    pushd ..
+    type backend\config\init_database_mysql.sql | .\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 --default-character-set=utf8mb4 2>nul
+    popd
+    chcp 936 >nul
+    .\bin\mysqladmin.exe -u root -pCairenbin2005 --protocol=TCP shutdown 2>nul
+    timeout /t 2 /nobreak >nul
+    echo First-time setup complete.
+    echo.
+)
+
+:: Regenerate my.ini.auto
 > "%AUTO_INI%" (
     for /f "usebackq delims=" %%l in ("my.ini") do (
         set "line=%%l"
@@ -82,16 +122,7 @@ set "AUTO_INI=%MYSQL_DIR%\my.ini.auto"
         echo !line!
     )
 )
-echo Starting MySQL in foreground window...
-:: Write temp launcher bat to avoid nested-quote hell
-> "%MYSQL_DIR%\_run_mysql.bat" (
-    echo @echo off
-    echo chcp 65001 ^>nul
-    echo cd /d "%MYSQL_DIR%"
-    echo start "EduMgmt MySQL" /MIN "%MYSQL_DIR%\bin\mysqld.exe" --defaults-file="%AUTO_INI%" --console
-)
-call "%MYSQL_DIR%\_run_mysql.bat"
-del "%MYSQL_DIR%\_run_mysql.bat" 2>nul
+start "EduMgmt MySQL" /MIN .\bin\mysqld.exe --defaults-file="%AUTO_INI%" --console
 popd
 
 echo Waiting for MySQL...
@@ -99,28 +130,27 @@ set "ATTEMPTS=0"
 :wait_mysql_fg
 timeout /t 1 /nobreak >nul
 set /a ATTEMPTS+=1
-"mysql-portable\bin\mysqladmin.exe" -u root --protocol=TCP ping 2>nul | findstr "alive" >nul
+"mysql-portable\bin\mysql.exe" -u root -pCairenbin2005 --protocol=TCP -e "SELECT 1;" 2>nul | findstr "1" >nul
 if %errorlevel% equ 0 goto :mysql_fg_ready
 if %ATTEMPTS% geq 20 goto :mysql_fg_timeout
 goto :wait_mysql_fg
 
 :mysql_fg_ready
-echo MySQL is ready (foreground mode).
+echo MySQL is ready ^(foreground^).
 pause
 goto :menu
 
 :mysql_fg_timeout
-echo MySQL did not start within 20s. Check the MySQL window.
+echo MySQL did not start within 20s.
 pause
 goto :menu
 
-:: =================================================================
+:: ─── MySQL Service (admin required) ───
 :mysql_start
 cls
-echo === MySQL Start (Service, Admin Required) ===
+echo === MySQL Start (Service) ===
 echo.
 
-echo Checking service status...
 sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul
 if %errorlevel% equ 0 (
     echo MySQL-EduMgmt already running.
@@ -143,12 +173,11 @@ if %errorlevel% equ 0 (
 )
 
 if not exist "mysql-portable\bin\mysqld.exe" (
-    echo mysql-portable\ not found. See MYSQL_SETUP_GUIDE.md.
+    echo mysql-portable\ not found.
     pause
     goto :menu
 )
 
-echo Installing MySQL-EduMgmt service from mysql-portable...
 pushd mysql-portable
 set "MYSQL_DIR=%CD%"
 set "AUTO_INI=%MYSQL_DIR%\my.ini.auto"
@@ -161,9 +190,7 @@ set "AUTO_INI=%MYSQL_DIR%\my.ini.auto"
 )
 .\bin\mysqld.exe --install MySQL-EduMgmt --defaults-file="%AUTO_INI%" 2>nul
 if %errorlevel% neq 0 (
-    echo.
-    echo Install failed. You need Administrator privileges.
-    echo Right-click server_control.bat ^> Run as Administrator.
+    echo Install failed. Right-click ^> Run as Administrator.
     popd
     pause
     goto :menu
@@ -172,35 +199,34 @@ net start MySQL-EduMgmt 2>nul
 if %errorlevel% equ 0 (
     echo MySQL-EduMgmt installed and started.
 ) else (
-    echo Service installed but failed to start. Check my.ini paths.
+    echo Service installed but failed to start.
 )
 popd
 pause
 goto :menu
 
-:: =================================================================
+:: ─── Stop MySQL ───
 :mysql_stop
 cls
 echo Stopping MySQL...
 taskkill /FI "WINDOWTITLE eq EduMgmt MySQL" /F 2>nul
 net stop MySQL-EduMgmt 2>nul
 net stop MySQL80 2>nul
-net stop MariaDB 2>nul
 echo Done.
 pause
 goto :menu
 
-:: =================================================================
+:: ─── Start Flask (localhost) ───
 :start_local
 cls
-echo === Start Server (localhost) ===
+echo === Start Server ^(localhost^) ===
 echo.
+"mysql-portable\bin\mysqladmin.exe" -u root -pCairenbin2005 --protocol=TCP ping 2>nul | findstr "alive" >nul
 sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul
 if %errorlevel% neq 0 (
-    "mysql-portable\bin\mysqladmin.exe" -u root --protocol=TCP ping 2>nul | findstr "alive" >nul
+    "mysql-portable\bin\mysql.exe" -u root -pCairenbin2005 --protocol=TCP -e "SELECT 1;" 2>nul | findstr "1" >nul
     if %errorlevel% neq 0 (
-        echo [WARNING] MySQL is not running.
-        echo Start it first: [D] or [F] from main menu.
+        echo [WARNING] MySQL is not running. Start it first: [D] or [F].
         echo.
     )
 )
@@ -210,32 +236,30 @@ echo Done.
 pause
 goto :menu
 
-:: =================================================================
+:: ─── Start Flask (LAN Public) ───
 :start_public
 cls
 echo === Start Server (LAN Public) ===
 echo.
+"mysql-portable\bin\mysqladmin.exe" -u root -pCairenbin2005 --protocol=TCP ping 2>nul | findstr "alive" >nul
 sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul
 if %errorlevel% neq 0 (
-    "mysql-portable\bin\mysqladmin.exe" -u root --protocol=TCP ping 2>nul | findstr "alive" >nul
+    "mysql-portable\bin\mysql.exe" -u root -pCairenbin2005 --protocol=TCP -e "SELECT 1;" 2>nul | findstr "1" >nul
     if %errorlevel% neq 0 (
-        echo [WARNING] MySQL is not running.
-        echo Start it first: [D] or [F] from main menu.
+        echo [WARNING] MySQL is not running. Start it first: [D] or [F].
         echo.
     )
 )
 echo Opening firewall port 5000...
 netsh advfirewall firewall add rule name="EduMgmt Flask 5000" dir=in action=allow protocol=TCP localport=5000 >nul 2>&1
-echo.
-echo   Local : http://localhost:5000
-echo   LAN   : http://%LOCAL_IP%:5000
+echo   LAN: http://%LOCAL_IP%:5000
 echo.
 start "EduMgmt Flask" python run.py --public
 echo Done.
 pause
 goto :menu
 
-:: =================================================================
+:: ─── Stop All ───
 :stop_all
 echo Stopping all EduMgmt processes...
 taskkill /FI "WINDOWTITLE eq EduMgmt Flask" /F 2>nul
@@ -244,37 +268,34 @@ echo Done.
 pause
 goto :menu
 
-:: =================================================================
+:: ─── Status ───
 :status
 cls
 echo === Status ===
 echo.
-tasklist 2>nul | findstr "EduMgmt" >nul && echo EduMgmt processes : RUNNING || echo EduMgmt processes : STOPPED
-sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul && echo MySQL-EduMgmt     : RUNNING
-sc query MySQL80       2>nul | findstr RUNNING >nul && echo MySQL80            : RUNNING
-sc query MariaDB       2>nul | findstr RUNNING >nul && echo MariaDB            : RUNNING
-"mysql-portable\bin\mysqladmin.exe" -u root --protocol=TCP ping 2>nul | findstr "alive" >nul && echo MySQL foreground   : RUNNING
-echo.
-netsh advfirewall firewall show rule name="EduMgmt Flask 5000" 2>nul | findstr Enabled >nul && echo Firewall          : Port 5000 OPEN || echo Firewall          : Port 5000 NO RULE
-echo LAN IPv4         : %LOCAL_IP%
+tasklist 2>nul | findstr "EduMgmt" >nul && echo Process         : RUNNING || echo Process         : STOPPED
+sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul && echo MySQL-EduMgmt   : RUNNING
+sc query MySQL80       2>nul | findstr RUNNING >nul && echo MySQL80          : RUNNING
+"mysql-portable\bin\mysqladmin.exe" -u root -pCairenbin2005 --protocol=TCP ping 2>nul | findstr "alive" >nul && echo MySQL foreground : RUNNING
+netsh advfirewall firewall show rule name="EduMgmt Flask 5000" 2>nul | findstr Enabled >nul && echo Firewall        : Port 5000 OPEN || echo Firewall        : Port 5000 NO RULE
+echo LAN IPv4       : %LOCAL_IP%
 echo.
 pause
 goto :menu
 
-:: =================================================================
+:: ─── Rebuild + Start ───
 :rebuild
 cls
 echo Building frontend...
 cd frontend
 call npm run build
 cd ..
-echo Starting server (public)...
 start "EduMgmt Flask" python run.py --public
 echo Done.
 pause
 goto :menu
 
-:: =================================================================
+:: ─── Partner Info ───
 :partner_info
 cls
 echo.
@@ -282,75 +303,72 @@ echo   LAN:  http://%LOCAL_IP%:5000
 echo.
 echo   Accounts:
 echo     admin  / 123456
-echo     T001   / 123456 (teacher)
-echo     STU001 / 123456 (student)
+echo     T001   / 123456 ^(teacher^)
+echo     STU001 / 123456 ^(student^)
 echo.
 pause
 goto :menu
 
-:: =================================================================
+:: ─── Distribute ───
 :distribute
 cls
 echo ============================================================
 echo   Package for Partner Distribution
 echo ============================================================
 echo.
-echo This creates a self-contained zip that partners can unzip
+echo This creates a self-contained zip that partners unzip
 echo and run with double-click on start_all.bat.
 echo.
 echo What is included:
-echo   - Full project source (backend + frontend)
-echo   - mysql-portable with pre-loaded database
-echo   - start_all.bat (one-click launch)
+echo   - Full project source ^(backend + frontend^)
+echo   - mysql-portable ^(portable MySQL, no data/^)
+echo   - start_all.bat ^(one-click launch, auto-init DB^)
 echo.
 
 set /p CONFIRM="Continue? (Y/N): "
 if /i not "%CONFIRM%"=="Y" goto :menu
 
 echo.
-echo [1/3] Purging machine-specific data from mysql-portable...
+echo [1/3] Purging machine-specific data...
 if exist "mysql-portable\data\auto.cnf" del "mysql-portable\data\auto.cnf"
-for %%f in ("mysql-portable\data\*.err") do if exist "%%f" del "%%f"
-if exist "mysql-portable\my.ini.auto" del "mysql-portable\my.ini.auto"
 pushd mysql-portable
+for %%f in ("data\*.err") do if exist "%%f" del "%%f"
+for %%f in ("data\*.pid") do if exist "%%f" del "%%f"
 if exist "data\" (
-    .\bin\mysqladmin.exe -u root --protocol=TCP ping 2>nul | findstr "alive" >nul
-    if %errorlevel% equ 0 (
-        .\bin\mysql.exe -u root --protocol=TCP -e "RESET MASTER;" 2>nul
-        .\bin\mysql.exe -u root --protocol=TCP -e "FLUSH LOGS;" 2>nul
-        echo Binary logs purged.
-    ) else (
-        echo MySQL not running, skipping binary log purge.
-    )
+    .\bin\mysql.exe -u root -pCairenbin2005 --protocol=TCP -e "RESET MASTER;" 2>nul
+    .\bin\mysql.exe -u root -pCairenbin2005 --protocol=TCP -e "FLUSH LOGS;" 2>nul
 )
 popd
+echo Done.
 
 echo.
 echo [2/3] Copying project files...
 set "PKG=%CD%\..\edu-mgmt-dist"
 if exist "%PKG%" rmdir /s /q "%PKG%"
 robocopy "%CD%" "%PKG%" /E /NFL /NDL /NJH /NJS /XD node_modules __pycache__ .git .claude .vscode .idea /XF *.pyc *.bak .env >nul
+:: Remove runtime data from package
+rmdir /s /q "%PKG%\mysql-portable\data" 2>nul
+del "%PKG%\mysql-portable\my.ini.auto" 2>nul
 if exist "%PKG%\backend\config\config.ini" del "%PKG%\backend\config\config.ini"
 if exist "%PKG%\backend\config\config.ini.example" copy "%PKG%\backend\config\config.ini.example" "%PKG%\backend\config\config.ini" >nul
 echo Copy complete.
 
 echo.
-echo [3/3] Creating zip archive...
+echo [3/3] Creating zip...
 powershell -Command "Compress-Archive -Path '%PKG%\*' -DestinationPath '%CD%\..\edu-mgmt-dist.zip' -Force" 2>nul
 rmdir /s /q "%PKG%"
 echo.
-echo ============================================================
 echo   Done: ..\edu-mgmt-dist.zip
 echo.
 echo   Partner instructions:
 echo     1. Unzip to any directory
-echo     2. Install Python 3.11+ (one-time)
+echo     2. Install Python 3.11+ ^(one-time^)
 echo     3. Double-click start_all.bat
 echo     4. Open http://localhost:5000
-echo ============================================================
+echo.
 pause
 goto :menu
 
-:: =================================================================
+:: ─── End ───
 :end
 endlocal
