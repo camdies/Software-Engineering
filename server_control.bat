@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal enabledelayedexpansion
 title EduMgmt Server Control Panel
 cd /d "%~dp0"
@@ -82,7 +83,7 @@ set "AUTO_INI=%MYSQL_DIR%\my.ini.auto"
     )
 )
 echo Starting MySQL in foreground window...
-start "EduMgmt MySQL" /MIN cmd /c ".\bin\mysqld.exe --defaults-file='%AUTO_INI%' --console"
+start "EduMgmt MySQL" /MIN cmd /c "cd /d \"%MYSQL_DIR%\" && \"%MYSQL_DIR%\bin\mysqld.exe\" --defaults-file=\"%AUTO_INI%\" --console"
 popd
 
 echo Waiting for MySQL...
@@ -111,7 +112,7 @@ cls
 echo === MySQL Start (Service, Admin Required) ===
 echo.
 
-echo [1/2] Checking service status...
+echo Checking service status...
 sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul
 if %errorlevel% equ 0 (
     echo MySQL-EduMgmt already running.
@@ -139,7 +140,7 @@ if not exist "mysql-portable\bin\mysqld.exe" (
     goto :menu
 )
 
-echo [2/2] Installing MySQL-EduMgmt service from mysql-portable...
+echo Installing MySQL-EduMgmt service from mysql-portable...
 pushd mysql-portable
 set "MYSQL_DIR=%CD%"
 set "AUTO_INI=%MYSQL_DIR%\my.ini.auto"
@@ -228,8 +229,9 @@ goto :menu
 
 :: =================================================================
 :stop_all
-echo Stopping Flask...
+echo Stopping all EduMgmt processes...
 taskkill /FI "WINDOWTITLE eq EduMgmt Flask" /F 2>nul
+taskkill /FI "WINDOWTITLE eq EduMgmt MySQL" /F 2>nul
 echo Done.
 pause
 goto :menu
@@ -239,14 +241,14 @@ goto :menu
 cls
 echo === Status ===
 echo.
-tasklist 2>nul | findstr "EduMgmt" >nul && echo Processes running || echo Processes stopped
-sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul && echo MySQL-EduMgmt : RUNNING
-sc query MySQL80       2>nul | findstr RUNNING >nul && echo MySQL80 : RUNNING
-sc query MariaDB       2>nul | findstr RUNNING >nul && echo MariaDB : RUNNING
-"mysql-portable\bin\mysqladmin.exe" -u root --protocol=TCP ping 2>nul | findstr "alive" >nul && echo MySQL foreground : RUNNING
+tasklist 2>nul | findstr "EduMgmt" >nul && echo EduMgmt processes : RUNNING || echo EduMgmt processes : STOPPED
+sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul && echo MySQL-EduMgmt     : RUNNING
+sc query MySQL80       2>nul | findstr RUNNING >nul && echo MySQL80            : RUNNING
+sc query MariaDB       2>nul | findstr RUNNING >nul && echo MariaDB            : RUNNING
+"mysql-portable\bin\mysqladmin.exe" -u root --protocol=TCP ping 2>nul | findstr "alive" >nul && echo MySQL foreground   : RUNNING
 echo.
-netsh advfirewall firewall show rule name="EduMgmt Flask 5000" 2>nul | findstr Enabled >nul && echo Firewall : Port 5000 OPEN || echo Firewall : Port 5000 NO RULE
-echo LAN IPv4 : %LOCAL_IP%
+netsh advfirewall firewall show rule name="EduMgmt Flask 5000" 2>nul | findstr Enabled >nul && echo Firewall          : Port 5000 OPEN || echo Firewall          : Port 5000 NO RULE
+echo LAN IPv4         : %LOCAL_IP%
 echo.
 pause
 goto :menu
@@ -300,7 +302,7 @@ if /i not "%CONFIRM%"=="Y" goto :menu
 echo.
 echo [1/3] Purging machine-specific data from mysql-portable...
 if exist "mysql-portable\data\auto.cnf" del "mysql-portable\data\auto.cnf"
-if exist "mysql-portable\data\*.err" del "mysql-portable\data\*.err"
+for %%f in ("mysql-portable\data\*.err") do if exist "%%f" del "%%f"
 if exist "mysql-portable\my.ini.auto" del "mysql-portable\my.ini.auto"
 pushd mysql-portable
 if exist "data\" (

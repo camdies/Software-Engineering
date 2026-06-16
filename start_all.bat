@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal enabledelayedexpansion
 title EduMgmt System - Quick Start
 cd /d "%~dp0"
@@ -9,7 +10,7 @@ echo   EduMgmt System v3.0 - Quick Start
 echo ============================================================
 echo.
 
-:: ───────── 1. Check Python ─────────
+:: Check Python
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Python is not installed or not in PATH.
@@ -20,7 +21,7 @@ if %errorlevel% neq 0 (
 )
 for /f "tokens=2" %%v in ('python --version 2^>^&1') do echo Python: %%v
 
-:: ───────── 2. Check/Fix my.ini paths ─────────
+:: Check/Fix my.ini paths
 if not exist "mysql-portable\my.ini" (
     echo [ERROR] mysql-portable\my.ini not found.
     pause
@@ -41,9 +42,9 @@ set "AUTO_INI=%MYSQL_DIR%\my.ini.auto"
 )
 popd
 
-:: ───────── 3. Start MySQL (foreground, no admin) ─────────
-echo Starting MySQL (foreground mode)...
-start "EduMgmt MySQL" /MIN cmd /c "cd /d "%MYSQL_DIR%" && .\bin\mysqld.exe --defaults-file="%AUTO_INI%" --console"
+:: Start MySQL (foreground, no admin)
+echo Starting MySQL in foreground mode...
+start "EduMgmt MySQL" /MIN cmd /c "cd /d \"%MYSQL_DIR%\" && \"%MYSQL_DIR%\bin\mysqld.exe\" --defaults-file=\"%AUTO_INI%\" --console"
 
 :: Wait for MySQL to be ready
 echo Waiting for MySQL to become ready...
@@ -62,14 +63,14 @@ goto :wait_mysql
 :mysql_ready
 echo MySQL is ready.
 
-:: ───────── 4. Check/Fix config.ini ─────────
+:: Check/Fix config.ini
 if not exist "backend\config\config.ini" (
     echo Creating backend\config\config.ini from template...
     copy "backend\config\config.ini.example" "backend\config\config.ini" >nul
     echo Edit backend\config\config.ini to configure database password if needed.
 )
 
-:: ───────── 5. Install Python deps (skip if already installed) ─────────
+:: Install Python deps (skip if already installed)
 echo Checking Python dependencies...
 pip show Flask >nul 2>&1 && pip show SQLAlchemy >nul 2>&1 && pip show PyMySQL >nul 2>&1
 if %errorlevel% neq 0 (
@@ -78,11 +79,11 @@ if %errorlevel% neq 0 (
     pip install Flask flask-cors PyJWT
 )
 
-:: ───────── 6. Start Flask ─────────
+:: Start Flask
 echo Starting Flask server...
 start "EduMgmt Flask" python run.py
 
-:: ───────── 7. Done ─────────
+:: Done
 echo.
 echo ============================================================
 echo   Setup complete!
