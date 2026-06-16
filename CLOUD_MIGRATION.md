@@ -49,10 +49,6 @@ git pull origin main
 ```
 双击 server_control.bat → [7] 打包分发给伙伴
 ```
-或手动打包：
-```powershell
-powershell -Command "Compress-Archive -Path 'backend','requirements.txt','requirements_web.txt','run.py','run_prod.py','README.md','API.md' -DestinationPath 'edu-mgmt-backend.zip' -Force"
-```
 
 3. 准备好 `backend\config\init_database_mysql.sql` 脚本文件
 
@@ -95,7 +91,8 @@ msiexec /i mysql-installer.msi /quiet
 
 ```powershell
 cd C:\edu-mgmt
-mysql -u root -p < backend\config\init_database_mysql.sql
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
+Get-Content backend\config\init_database_mysql.sql -Encoding UTF8 | mysql -u root -p --default-character-set=utf8mb4
 ```
 
 验证：
@@ -299,3 +296,4 @@ npm run dev
 | Nginx 404 错误 | 确认 nginx.conf 中 root 路径正确 |
 | 跨域 CORS 错误 | app_factory.py 已配置 `origins: "*"`，无需额外设置 |
 | MySQL 连接超时 | 检查 MySQL 服务是否启动: `sc query MySQL80` |
+| 网页中文显示 ??? | 参考 MYSQL_SETUP_GUIDE.md：确保管道编码 + `--default-character-set=utf8mb4` |
