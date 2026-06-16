@@ -24,95 +24,92 @@ if not exist "mysql-portable\my.ini" (
     exit /b 1
 )
 
-:: Check / Fix config.ini -- always force driver=mysql + correct password
+:: Check / Fix config.ini
 if not exist "backend\config\config.ini" (
     echo  Creating config.ini from template...
     copy "backend\config\config.ini.example" "backend\config\config.ini" >nul
 )
 echo  Fixing config.ini for MySQL...
-powershell -Command ^
-  "$c = Get-Content 'backend\config\config.ini' -Raw; ^
-   $c = $c -replace 'driver\s*=\s*mssql','driver = mysql'; ^
-   $c = $c -replace 'driver\s*=\s*mysql','driver = mysql'; ^
-   $c = $c -replace 'password\s*=\s*.*','password = Cairenbin2005'; ^
-   $c = $c -replace 'port\s*=\s*1433','port = 3306'; ^
-   Set-Content 'backend\config\config.ini' -Value $c -NoNewline" 2>nul
+powershell -Command "$c=Get-Content 'backend\config\config.ini' -Raw; $c=$c -replace 'driver\s*=\s*mssql','driver = mysql'; $c=$c -replace 'password\s*=\s*.*','password = Cairenbin2005'; $c=$c -replace 'port\s*=\s*1433','port = 3306'; Set-Content 'backend\config\config.ini' -Value $c -NoNewline" 2>nul
 
-:: Generate my.ini.auto with correct paths
+:: Generate my.ini.auto + first-time init
 pushd mysql-portable
-set "MYSQL_DIR=%CD%"
-set "AUTO_INI=%MYSQL_DIR%\my.ini.auto"
-> "%AUTO_INI%" (
+set "MD=%CD%"
+set "AINI=%MD%\my.ini.auto"
+
+:: Generate my.ini.auto
+> "%AINI%" (
     for /f "usebackq delims=" %%l in ("my.ini") do (
         set "line=%%l"
-        set "line=!line:CURRENT_DIR=%MYSQL_DIR%!"
-        set "line=!line:CURRENT_DIR\data=%MYSQL_DIR%\data!"
+        set "line=!line:CURRENT_DIR=%MD%!"
+        set "line=!line:CURRENT_DIR\data=%MD%\data!"
         echo !line!
     )
 )
 
 :: First-time init if data/ missing
-if not exist "data\" (
+if exist "data\" goto :skip_init
+
+echo.
+echo  [ First-time setup: initializing MySQL... ]
+echo  This runs once. Please wait about 10 seconds.
+echo.
+
+mkdir data
+.\bin\mysqld.exe --defaults-file="%AINI%" --initialize-insecure --console
+if %errorlevel% neq 0 (
     echo.
-    echo  [ First-time setup: initializing MySQL... ]
-    echo  This runs once. Please wait about 10 seconds.
-    echo.
-
-    mkdir data
-    .\bin\mysqld.exe --defaults-file="%AUTO_INI%" --initialize-insecure --console
-    if %errorlevel% neq 0 (
-        echo.
-        echo  [ERROR] MySQL init failed.
-        pause
-        popd
-        exit /b 1
-    )
-    echo  MySQL data directory created.
-
-    start "EduMgmt MySQL Init" /MIN .\bin\mysqld.exe --defaults-file="%AUTO_INI%" --console
-
-    set "ATTEMPTS=0"
-    :wait_init
-    timeout /t 1 /nobreak >nul
-    set /a ATTEMPTS+=1
-    .\bin\mysql.exe -u root --protocol=TCP -e "SELECT 1;" 2>nul | findstr "1" >nul
-    if %errorlevel% equ 0 goto :mysql_init_ready
-    if !ATTEMPTS! geq 30 (
-        echo  [ERROR] MySQL failed to start.
-        taskkill /FI "WINDOWTITLE eq EduMgmt MySQL Init" /F 2>nul
-        pause
-        popd
-        exit /b 1
-    )
-    goto :wait_init
-
-    :mysql_init_ready
-    echo  MySQL started. Importing database...
-
-    .\bin\mysql.exe -u root --protocol=TCP -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'Cairenbin2005'; FLUSH PRIVILEGES;" 2>nul
-
-    chcp 65001 >nul
-    pushd ..
-    type backend\config\init_database_mysql.sql | .\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 --default-character-set=utf8mb4 2>nul
+    echo  [ERROR] MySQL init failed.
+    pause
     popd
-    chcp 936 >nul
-
-    echo  Database imported.
-
-    .\bin\mysqladmin.exe -u root -pCairenbin2005 --protocol=TCP shutdown 2>nul
-    timeout /t 2 /nobreak >nul
-    taskkill /FI "WINDOWTITLE eq EduMgmt MySQL Init" /F 2>nul
-
-    echo  First-time setup complete.
-    echo.
+    exit /b 1
 )
+echo  MySQL data directory created.
 
+start "EduMgmt MySQL Init" /MIN .\bin\mysqld.exe --defaults-file="%AINI%" --console
+
+set "ATTEMPTS=0"
+:wait_init
+timeout /t 1 /nobreak >nul
+set /a ATTEMPTS+=1
+.\bin\mysql.exe -u root --protocol=TCP -e "SELECT 1;" 2>nul | findstr "1" >nul
+if %errorlevel% equ 0 goto :mysql_init_ready
+if !ATTEMPTS! geq 30 (
+    echo  [ERROR] MySQL failed to start.
+    taskkill /FI "WINDOWTITLE eq EduMgmt MySQL Init" /F 2>nul
+    pause
+    popd
+    exit /b 1
+)
+goto :wait_init
+
+:mysql_init_ready
+echo  MySQL started. Importing database...
+
+.\bin\mysql.exe -u root --protocol=TCP -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'Cairenbin2005'; FLUSH PRIVILEGES;" 2>nul
+
+chcp 65001 >nul
+pushd ..
+type backend\config\init_database_mysql.sql | .\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 --default-character-set=utf8mb4 2>nul
+popd
+chcp 936 >nul
+
+echo  Database imported.
+
+.\bin\mysqladmin.exe -u root -pCairenbin2005 --protocol=TCP shutdown 2>nul
+timeout /t 2 /nobreak >nul
+taskkill /FI "WINDOWTITLE eq EduMgmt MySQL Init" /F 2>nul
+
+echo  First-time setup complete.
+echo.
+
+:skip_init
 popd
 
 :: Start MySQL
 echo  Starting MySQL...
 pushd mysql-portable
-start "EduMgmt MySQL" /MIN .\bin\mysqld.exe --defaults-file="%AUTO_INI%" --console
+start "EduMgmt MySQL" /MIN .\bin\mysqld.exe --defaults-file="%AINI%" --console
 popd
 
 echo  Waiting for MySQL to become ready...
@@ -122,9 +119,7 @@ timeout /t 1 /nobreak >nul
 set /a ATTEMPTS+=1
 "mysql-portable\bin\mysql.exe" -u root -pCairenbin2005 --protocol=TCP -e "SELECT 1;" 2>nul | findstr "1" >nul
 if %errorlevel% equ 0 goto :mysql_ready
-if %ATTEMPTS% geq 20 (
-    echo  [WARNING] MySQL did not start within 20 seconds.
-)
+if %ATTEMPTS% geq 20 goto :mysql_ready
 goto :wait_mysql
 
 :mysql_ready

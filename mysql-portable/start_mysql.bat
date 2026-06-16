@@ -15,40 +15,41 @@ set "AUTO_INI=%MYSQL_DIR%\my.ini.auto"
 )
 
 :: Auto-init if data/ missing
-if not exist "data\" (
-    echo Data directory not found. Running first-time init...
-    mkdir data
-    .\bin\mysqld.exe --defaults-file="%AUTO_INI%" --initialize-insecure --console
-    if %errorlevel% neq 0 (
-        echo [ERROR] MySQL init failed.
-        pause
-        exit /b 1
-    )
-    echo Init OK. Starting temp instance to import DB...
-    start "EduMgmt MySQL Init" /MIN .\bin\mysqld.exe --defaults-file="%AUTO_INI%" --console
-    set "AT=0"
-    :wait_init_local
-    timeout /t 1 /nobreak >nul
-    set /a AT+=1
-    if !AT! geq 30 (
-        taskkill /FI "WINDOWTITLE eq EduMgmt MySQL Init" /F 2>nul
-        echo [ERROR] MySQL failed to start.
-        pause
-        exit /b 1
-    )
-    .\bin\mysql.exe -u root --protocol=TCP -e "SELECT 1;" 2>nul | findstr "1" >nul || goto :wait_init_local
-    .\bin\mysql.exe -u root --protocol=TCP -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'Cairenbin2005'; FLUSH PRIVILEGES;" 2>nul
-    chcp 65001 >nul
-    pushd ..
-    type backend\config\init_database_mysql.sql | .\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 --default-character-set=utf8mb4 2>nul
-    popd
-    chcp 936 >nul
-    .\bin\mysqladmin.exe -u root -pCairenbin2005 --protocol=TCP shutdown 2>nul
-    timeout /t 2 /nobreak >nul
-    echo First-time setup complete.
-    echo.
+if exist "data\" goto :after_init
+echo Data directory not found. Running first-time init...
+mkdir data
+.\bin\mysqld.exe --defaults-file="%AUTO_INI%" --initialize-insecure --console
+if %errorlevel% neq 0 (
+    echo [ERROR] MySQL init failed.
+    pause
+    exit /b 1
 )
+echo Init OK. Starting temp instance to import DB...
+start "EduMgmt MySQL Init" /MIN .\bin\mysqld.exe --defaults-file="%AUTO_INI%" --console
+set "AT=0"
+:wait_init_local
+timeout /t 1 /nobreak >nul
+set /a AT+=1
+if !AT! geq 30 (
+    taskkill /FI "WINDOWTITLE eq EduMgmt MySQL Init" /F 2>nul
+    echo [ERROR] MySQL failed to start.
+    pause
+    exit /b 1
+)
+.\bin\mysql.exe -u root --protocol=TCP -e "SELECT 1;" 2>nul | findstr "1" >nul
+if %errorlevel% neq 0 goto :wait_init_local
+.\bin\mysql.exe -u root --protocol=TCP -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'Cairenbin2005'; FLUSH PRIVILEGES;" 2>nul
+chcp 65001 >nul
+pushd ..
+type backend\config\init_database_mysql.sql | .\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 --default-character-set=utf8mb4 2>nul
+popd
+chcp 936 >nul
+.\bin\mysqladmin.exe -u root -pCairenbin2005 --protocol=TCP shutdown 2>nul
+timeout /t 2 /nobreak >nul
+echo First-time setup complete.
+echo.
 
+:after_init
 echo MySQL base dir: %MYSQL_DIR%
 echo.
 
