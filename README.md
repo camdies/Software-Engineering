@@ -43,8 +43,8 @@
 |------|------|
 | 前端 | Vue.js 3 + Element Plus + Vite |
 | 后端 API | Flask + JWT |
-| 数据访问 | SQLAlchemy / pyodbc / pymssql |
-| 数据库 | SQL Server / MySQL |
+| 数据访问 | SQLAlchemy + PyMySQL |
+| 数据库 | MySQL 8.0+ (默认) / SQL Server (可选) |
 
 ---
 
@@ -52,27 +52,55 @@
 
 - Python 3.11+
 - Node.js 18+ (前端开发需要)
-- SQL Server（配置见 [SQL_SERVER_SETUP_GUIDE.md](./SQL_SERVER_SETUP_GUIDE.md)）
+- MySQL 8.0+（配置见 [MYSQL_SETUP_GUIDE.md](./MYSQL_SETUP_GUIDE.md)）
 
 ---
 
 ## 快速开始
 
-### 1. 配置数据库
+### 方式一：一键启动（推荐，无需安装 MySQL）
 
-参考 [SQL_SERVER_SETUP_GUIDE.md](./SQL_SERVER_SETUP_GUIDE.md) 安装并配置 SQL Server，
-然后在 SSMS 中执行 `backend/config/init_database.sql`（新版 v3.0，包含 class_period 和 semester_config 新表）。
+```powershell
+# 1. 安装 Python 3.11+（https://www.python.org/downloads/，勾选 Add Python to PATH）
+# 2. 双击 start_all.bat
+# 3. 浏览器打开 http://localhost:5000
+```
 
-### 2. 修改数据库连接
+`start_all.bat` 自动完成：生成 `my.ini` 路径 → 启动 MySQL 前台 → 安装 Python 依赖 → 启动 Flask。
 
-将 `backend/config/config.ini.example` 复制为 `backend/config/config.ini`，编辑其中的数据库连接信息。
+### 方式二：分步手动启动
 
-### 3. 安装依赖并启动
+#### 1. 安装并配置 MySQL
+
+参考 **[MYSQL_SETUP_GUIDE.md](./MYSQL_SETUP_GUIDE.md)** — 完整指引：下载 → 初始化 → 嵌入项目目录。
+
+#### 2. 初始化数据库
+
+```powershell
+# 注意：PowerShell 管道必须设置 UTF-8 编码，否则中文数据损坏
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
+Get-Content backend\config\init_database_mysql.sql -Encoding UTF8 | mysql -u root -p --default-character-set=utf8mb4
+```
+
+#### 3. 修改数据库连接
+
+将 `backend/config/config.ini.example` 复制为 `backend/config/config.ini`，编辑其中的数据库连接信息：
+```ini
+[database]
+driver = mysql
+host = localhost
+port = 3306
+user = root
+password = YOUR_MYSQL_PASSWORD
+database = course_management_db
+```
+
+#### 4. 安装依赖并启动
 
 ```powershell
 # Python 依赖
 pip install -r requirements.txt
-pip install Flask flask-cors PyJWT marshmallow
+pip install Flask flask-cors PyJWT
 
 # 构建前端（首次或前端有修改时需要）
 cd frontend
@@ -86,7 +114,7 @@ python run.py
 
 浏览器访问 `http://localhost:5000`
 
-### 4. 前端开发模式（可选）
+### 5. 前端开发模式（可选）
 
 ```powershell
 cd frontend
@@ -154,9 +182,10 @@ npm run dev       # http://localhost:5173，自动代理 API 到 :5000
 ## 项目结构
 
 ```
-course_selection_system/
+高校教务管理系统/
 ├── backend/
 │   ├── api/              # Flask REST API (Blueprints, 9个)
+│   │   └── blueprints/   # 按功能模块拆分
 │   ├── controllers/      # 业务逻辑 (7个控制器)
 │   ├── models/           # SQLAlchemy ORM (11个模型)
 │   ├── config/           # 配置文件 + DDL 初始化脚本
@@ -166,18 +195,24 @@ course_selection_system/
 │       ├── views/        # 页面组件
 │       │   ├── admin/    # 管理员（5个）
 │       │   ├── teacher/  # 教师（4个）
-│       │   └── student/  # 学生（5个）
+│       │   └── student/  # 学生（4个）
 │       ├── router/       # Vue Router
 │       ├── stores/       # Pinia
+│       ├── layouts/      # 布局组件
 │       └── components/   # 通用组件
+├── mysql-portable/       # MySQL 8.0 便携版（start_all.bat 自动启动）
 ├── tests/
 ├── run.py
+├── start_all.bat         # 一键启动（MySQL + Flask）
+├── server_control.bat    # 服务管理控制面板
 ├── README.md
-└── SQL_SERVER_SETUP_GUIDE.md
+├── API.md
+├── ARCHITECTURE.md
+└── MYSQL_SETUP_GUIDE.md
 ```
 
 ---
 
 ## 许可证
 
-[AGPL-3.0](../LICENSE)
+[AGPL-3.0](LICENSE)

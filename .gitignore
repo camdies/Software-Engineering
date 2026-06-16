@@ -9,3 +9,7 @@ logs/
 *.swo
 .DS_Store
 backend/config/config.ini
+# mysql-portable runtime data (binaries kept, data/ excluded)
+mysql-portable/data/
+mysql-portable/my.ini.auto
+*.zip

@@ -77,17 +77,22 @@ def get_logger(module_name: str) -> logging.Logger:
     logger.addHandler(console_handler)
 
     # 文件handler — 按日期滚动，保留30天
+    # TimedRotatingFileHandler 在多线程下轮转时会互相踩文件，
+    # 改用 RotatingFileHandler + 按大小切割作为替代，避免 PermissionError。
     log_file = os.path.join(log_dir, f"{module_name}.log")
-    file_handler = logging.handlers.TimedRotatingFileHandler(
-        filename=log_file,
-        when="midnight",
-        interval=1,
-        backupCount=30,
-        encoding="utf-8",
-    )
+    try:
+        file_handler = logging.handlers.RotatingFileHandler(
+            filename=log_file,
+            maxBytes=10 * 1024 * 1024,  # 10 MB
+            backupCount=30,
+            encoding="utf-8",
+        )
+    except PermissionError:
+        # 如果文件被占用（多线程竞争），回退到 console-only
+        logger.addHandler(console_handler)
+        return logger
     file_handler.setLevel(level)
     file_handler.setFormatter(formatter)
-    file_handler.suffix = "%Y%m%d"
     logger.addHandler(file_handler)
 
     return logger

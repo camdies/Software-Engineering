@@ -3,7 +3,7 @@
 > 总文件数: **124** (不含 .venv, node_modules, __pycache__, .git)  
 > 后端: Python Flask + SQLAlchemy (38 .py)  
 > 前端: Vue 3 + Element Plus + Vite (17 .vue + 5 .js)  
-> 数据库: SQL Server / MySQL (1 .sql)
+> 数据库: MySQL 8.0+ (默认) / SQL Server (可选) (2 .sql)
 
 ---
 
@@ -20,10 +20,10 @@
 │   └── utils/            # 6 个工具模块
 ├── frontend/             ← Vue.js 3 SPA
 │   ├── src/
-│   │   ├── views/        # 16 个页面组件
-│   │   │   ├── admin/    # 管理员端 (8个)
+│   │   ├── views/        # 14 个页面组件
+│   │   │   ├── admin/    # 管理员端 (7个)
 │   │   │   ├── teacher/  # 教师端 (4个)
-│   │   │   └── student/  # 学生端 (4个)
+│   │   │   └── student/  # 学生端 (3个)
 │   │   ├── router/       # Vue Router 配置
 │   │   ├── stores/       # Pinia 状态管理
 │   │   ├── layouts/      # 布局组件
@@ -33,9 +33,10 @@
 │   └── dist/             # 构建产物
 ├── tests/                # 测试用例
 ├── logs/                 # 日志文件
-├── *.bat                 # Windows 批处理工具
-├── *.md                  # 文档
-└── run.py / run_prod.py  # 入口文件
+├── *.bat                 # Windows 批处理工具 (start_all/server_control/partner_connect)
+├── *.md                  # 文档 (7个)
+├── mysql-portable/       # MySQL 8.0 便携版 (含 start_mysql.bat)
+└── run.py                # 入口文件
 ```
 
 ---
@@ -107,9 +108,10 @@
 
 | 文件 | 大小 | 说明 |
 |------|------|------|
-| `init_database.sql` | 24.8 KB | 完整 DDL + 测试数据 (11表, 7课程, 5学生, 3教师) |
-| `config.ini.example` | 0.7 KB | 数据库/系统/Web/选课 配置模板 |
-| `settings.py` | 4.8 KB | ConfigParser 配置读取单例 |
+| `init_database_mysql.sql` | ~22 KB | 完整 MySQL DDL + 测试数据 (11表, 含 new_password 列) |
+| `init_database.sql` | 24.8 KB | SQL Server 版 DDL (同结构，不同语法) |
+| `config.ini.example` | ~1 KB | 数据库/系统/Web/选课 配置模板（含 [web] 段 jwt_secret） |
+| `settings.py` | ~5 KB | ConfigParser 配置读取单例 |
 
 ---
 
@@ -154,7 +156,7 @@
 
 ### 3.3 视图组件 (`src/views/`)
 
-**管理员端 (8个)**
+**管理员端 (7个)**
 
 | 文件 | 大小 | 功能 |
 |------|------|------|
@@ -165,8 +167,6 @@
 | `AdminAudit.vue` | 7.2 KB | 三合一审核中心 (密码重置/成绩/课程) |
 | `AdminEnrollmentStats.vue` | 1.8 KB | 选课统计 (容量/已选进度条) |
 | `AdminLogs.vue` | 2.3 KB | 操作日志分页查询 |
-| `AdminEnrollmentControl.vue` | 1.7 KB | 选课时段开关控制 |
-| `AdminGradeAudit.vue` | 1.9 KB | 成绩审核 (未注册路由, 冗余) |
 
 **教师端 (4个)**
 
@@ -177,7 +177,7 @@
 | `TeacherGradeModify.vue` | 2.9 KB | 成绩修改申请 |
 | `TeacherStats.vue` | 3.9 KB | 班级统计/分数段分布/排名 |
 
-**学生端 (5个)**
+**学生端 (3个)**
 
 | 文件 | 大小 | 功能 |
 |------|------|------|
@@ -185,7 +185,6 @@
 | `StudentSchedule.vue` | 9.2 KB | 个人课表: 11节×7天周表 + 彩色课程块 + Excel/PDF导出 |
 | `StudentGrades.vue` | 1.5 KB | 成绩查询 (颜色标记分数段) |
 | `StudentStats.vue` | 1.3 KB | 学业统计 (学分/GPA/未通过课程) |
-| `StudentMyCourses.vue` | 1.6 KB | 已选课程列表 (未注册路由, 冗余) |
 
 **登录 (1个)**
 
@@ -216,10 +215,11 @@
 
 | 文件 | 大小 | 说明 |
 |------|------|------|
-| `server_control.bat` | 14.7 KB | 服务器控制面板: 启停/状态/IPv6/分发/外网指南 |
-| `partner_connect.bat` | 5.9 KB | 伙伴连接配置: LAN/IPv6/WAN 三模式自动代理 |
+| `server_control.bat` | ~15 KB | 服务器控制面板: 启停/状态/分发/MySQL前台/后台 |
+| `start_all.bat` | ~3 KB | 一键启动（MySQL + Flask + 依赖安装） |
+| `partner_connect.bat` | 5.9 KB | 伙伴前端开发代理配置: LAN/IPv6/WAN 三模式 |
 | `ipv6_diagnostic.bat` | 6.8 KB | IPv6 连通性诊断: 5项检测 + 防火墙修复 |
-| `start.ps1` | 0.2 KB | 旧版 PySide6 启动脚本 (已废弃) |
+| `mysql-portable/start_mysql.bat` | ~1 KB | MySQL 独立启动（自动路径替换） |
 
 ---
 
@@ -229,9 +229,10 @@
 |------|------|------|
 | `README.md` | 6.4 KB | 项目说明、技术栈、快速开始、默认账号、上课时间表 |
 | `API.md` | 15.8 KB | 完整 API 文档 (46端点, 请求/响应示例, 错误码) |
-| `CLOUD_MIGRATION.md` | 9.5 KB | 腾讯云轻量服务器迁移教程 (Nginx + Flask + SQL Server) |
-| `SETUP_PARTNER.md` | 8.2 KB | 开发伙伴协作指南 (主机+伙伴双人配置, IPv6/外网方案) |
-| `SQL_SERVER_SETUP_GUIDE.md` | 11.7 KB | SQL Server + SSMS + ODBC 安装与配置完整指南 |
+| `CLOUD_MIGRATION.md` | 9.5 KB | 腾讯云轻量服务器迁移教程 (Nginx + Flask + MySQL) |
+| `SETUP_PARTNER.md` | ~5 KB | 开发伙伴协作指南（完整分发/浏览器直连/前端代理三模式） |
+| `SQL_SERVER_SETUP_GUIDE.md` | ~12 KB | SQL Server + SSMS + ODBC 安装与配置完整指南 |
+| `MYSQL_SETUP_GUIDE.md` | ~3 KB | 数据库修复/重建/迁移指引 |
 
 ---
 

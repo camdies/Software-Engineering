@@ -1,8 +1,8 @@
 """
 backend/models/base.py - 数据库连接基础模块
 
-支持 SQL Server (pyodbc) 和 MySQL (PyMySQL) 双驱动，
-通过 config.ini [database].driver 字段自动切换。
+支持 MySQL (PyMySQL) 和 SQL Server (pyodbc) 双驱动，
+通过 config.ini [database].driver 字段自动切换（默认 mysql）。
 采用单例模式管理数据库连接。
 """
 
@@ -42,7 +42,7 @@ class DatabaseManager:
         self._initialized = True
         self._engine = None
         self._Session = None
-        self._driver = "mssql"
+        self._driver = "mysql"
         self._ensure_models_loaded()
         self._init_engine()
 
@@ -69,14 +69,15 @@ class DatabaseManager:
     def _init_engine(self):
         """从配置文件读取参数并创建 SQLAlchemy Engine。
 
-        SQL Server (mssql):
-          - 使用 pyodbc + ODBC Driver 18 for SQL Server
-          - pool_size=10, max_overflow=20, pool_timeout=30
+        MySQL (mysql):
+          - 使用 PyMySQL + utf8mb4
+          - pool_size=10, max_overflow=20, pool_timeout=10
           - pool_pre_ping=True 维持长连接
 
-        MySQL (mysql):
-          - 使用 PyMySQL
+        SQL Server (mssql):
+          - 使用 pyodbc + ODBC Driver 18 for SQL Server
           - 同连接池参数
+          - 自动设置 READ COMMITTED 隔离级别
         """
         try:
             from backend.config.settings import Settings
@@ -84,7 +85,7 @@ class DatabaseManager:
             settings = Settings.get_instance()
             db = settings.database
             db_url = settings.database_url
-            self._driver = db.get("driver", "mssql")
+            self._driver = db.get("driver", "mysql")
 
             logger.info(
                 f"正在连接数据库 [{self._driver}] "
@@ -92,6 +93,10 @@ class DatabaseManager:
             )
 
             connect_args = {}
+
+            # MySQL: 强制 utf8mb4 字符集，避免中文乱码
+            if self._driver == "mysql":
+                connect_args = {"charset": "utf8mb4"}
 
             # pyodbc 额外参数
             if self._driver == "mssql" and "pyodbc" in db_url:

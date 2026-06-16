@@ -1,7 +1,7 @@
 # Microsoft SQL Server + SSMS 安装与配置指南 v3.0
 
 > **适用**: 高校教务管理系统
-> **数据库**: Microsoft SQL Server (Developer Edition)
+> **数据库**: Microsoft SQL Server 2022 (Developer Edition) 或更高版本
 > **管理工具**: SQL Server Management Studio (SSMS)
 
 ---
@@ -9,7 +9,7 @@
 ## 目录
 
 1. [系统要求](#1-系统要求)
-2. [安装 SQL Server 2025](#2-安装-sql-server-2025)
+2. [安装 SQL Server 2022](#2-安装-sql-server-2022)
 3. [安装 SSMS 2022](#3-安装-ssms-2022)
 4. [安装 ODBC Driver 18](#4-安装-odbc-driver-18)
 5. [配置 SQL Server](#5-配置-sql-server)
@@ -32,11 +32,11 @@
 
 ---
 
-## 2. 安装 SQL Server 2025
+## 2. 安装 SQL Server 2022
 
 ### 2.1 下载
 
-从 Microsoft 官方下载 SQL Server 2025 **Developer Edition**（免费，功能完整）：
+从 Microsoft 官方下载 SQL Server 2022 **Developer Edition**（免费，功能完整）：
 
 - 官方下载页: https://www.microsoft.com/sql-server/sql-server-downloads
 - 直接选择 **Developer** 版本
@@ -44,7 +44,7 @@
 ### 2.2 安装步骤
 
 ```
-1. 运行 SQL2025-SSEI-Dev.exe
+1. 运行 SQL2022-SSEI-Dev.exe
 2. 选择安装类型 → "自定义"
 3. 指定安装目录（默认 C:\Program Files\Microsoft SQL Server）
 4. 等待安装程序下载组件
@@ -95,14 +95,14 @@ Win + R → 输入 SQLServerManager16.msc → 回车
 
 ---
 
-## 3. 安装 SSMS 2022
+## 3. 安装 SSMS 20.x
 
 ### 3.1 下载
 
 SSMS 是独立的免费工具：
 
 - 下载页: https://aka.ms/ssmsfullsetup
-- 当前推荐版本: **SSMS 20.x**（兼容 SQL Server 2025）
+- 当前推荐版本: **SSMS 20.x**（兼容 SQL Server 2022+）
 
 ### 3.2 安装
 

@@ -2,7 +2,7 @@
 
 create_app() 函数创建并配置 Flask 应用：
 - 初始化数据库
-- 注册所有 7 个 Blueprint
+- 注册所有 9 个 Blueprint
 - 配置 CORS
 - 生产模式：服务 Vue dist 静态文件 + SPA fallback
 """
@@ -40,6 +40,7 @@ def create_app() -> Flask:
         __name__,
         static_folder=None,  # 我们手动处理静态文件
     )
+    app.config['JSON_AS_ASCII'] = False  # 中文不转义为 \uXXXX
 
     # CORS — 允许跨域（开发时 Vite dev server 在不同端口）
     CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -62,12 +63,18 @@ def create_app() -> Flask:
 
     @app.errorhandler(500)
     def handle_500(e):
+        import traceback
+        from backend.utils.log_util import get_logger
+        _log = get_logger("app_factory")
+        _log.error(f"500 Internal Server Error: {e}\n{traceback.format_exc()}")
         return error_response("服务器内部错误", status_code=500)
 
     # ── 生产模式：服务 Vue 前端静态文件 ──
     _setup_static_serving(app)
 
     # ── 初始化数据库（延迟到首次请求）──
+    # 仅初始化连接，不做 create_all_tables —
+    # DDL 脚本已通过 init_database_mysql.sql 导入全部表结构。
     @app.before_request
     def _init_db_on_first_request():
         if getattr(app, '_db_ready', False):

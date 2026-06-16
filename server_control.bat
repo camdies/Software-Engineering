@@ -1,27 +1,14 @@
 @echo off
+chcp 65001 >nul
 setlocal enabledelayedexpansion
 title EduMgmt Server Control Panel
+cd /d "%~dp0"
 
-set PROJECT_DIR=%~dp0
-cd /d "%PROJECT_DIR%"
-
-:: Get local IP
-for /f "tokens=*" %%a in ('powershell -NoProfile -Command ^
-    "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.InterfaceAlias -notlike '*Loopback*' -and $_.PrefixOrigin -ne 'WellKnown'}).IPAddress | Select-Object -First 1" 2^>nul') do (
-    if not "%%a"=="" set "LOCAL_IP=%%a"
+set "LOCAL_IP="
+for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /i "IPv4" ^| findstr /v "127.0.0.1" 2^>nul') do (
+    for /f "tokens=*" %%b in ("%%a") do if "%LOCAL_IP%"=="" set "LOCAL_IP=%%b"
 )
-if "%LOCAL_IP%"=="" (
-    for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /i "IPv4" ^| findstr /v "127.0.0.1"') do (
-        for /f "tokens=*" %%b in ("%%a") do set "LOCAL_IP=%%b"
-    )
-)
-
-:: Get IPv6 address (skip loopback and link-local)
-set "IPV6="
-for /f "tokens=*" %%a in ('powershell -NoProfile -Command ^
-    "(Get-NetIPAddress -AddressFamily IPv6 | Where-Object {$_.InterfaceAlias -notlike '*Loopback*' -and $_.IPAddress -notlike 'fe80*' -and $_.IPAddress -notlike '::1'}).IPAddress | Select-Object -First 1" 2^>nul') do (
-    if not "%%a"=="" set "IPV6=%%a"
-)
+if "%LOCAL_IP%"=="" set "LOCAL_IP=unknown"
 
 :menu
 cls
@@ -29,393 +16,341 @@ echo ============================================================
 echo   EduMgmt System v3.0 - Server Control Panel
 echo ============================================================
 echo.
-echo   Local IP:  %LOCAL_IP%
-if not "%IPV6%"=="" echo   IPv6:      %IPV6%
-echo   Project:   %PROJECT_DIR%
+echo   LAN IP : %LOCAL_IP%
+echo   Project: %CD%
 echo.
-echo   ---- Server Control ----
-echo   [1] Start server (localhost only)
-echo   [2] Start server (LAN + IPv6 public)
+echo   [1] Start server (localhost)
+echo   [2] Start server (LAN public)
 echo   [3] Stop server
-echo   [4] View server status
+echo   [4] View status
 echo   [5] Rebuild frontend and start
 echo.
-echo   ---- External Access ----
-echo   [A] IPv6 direct access guide and test
-echo   [B] All external access options (port forward, frp, ZeroTier...)
+echo   [D] Start MySQL (service, admin)
+echo   [F] Start MySQL (foreground, no admin)
+echo   [E] Stop MySQL
 echo.
-echo   ---- Partner Tools ----
-echo   [6] Partner connection info
-echo   [7] Package and distribute for partner
+echo   [6] Partner info
+echo   [7] Package for partner (inc. mysql-portable)
 echo.
-echo   [R] Return to this menu
 echo   [0] Exit
 echo --------------------------------------------------
 echo.
 
+set "CHOICE="
 set /p CHOICE="Select: "
 
-if "%CHOICE%"=="1" goto :start_local
-if "%CHOICE%"=="2" goto :start_public
-if "%CHOICE%"=="3" goto :stop
-if "%CHOICE%"=="4" goto :status
-if "%CHOICE%"=="5" goto :rebuild
-if "%CHOICE%"=="6" goto :partner_info
-if "%CHOICE%"=="7" goto :distribute
-if /i "%CHOICE%"=="A" goto :ipv6_guide
-if /i "%CHOICE%"=="B" goto :ext_access_guide
-if /i "%CHOICE%"=="R" goto :menu
-if "%CHOICE%"=="0" goto :end
-echo Invalid option, try again...
+if "%CHOICE%"=="1"  goto :start_local
+if "%CHOICE%"=="2"  goto :start_public
+if "%CHOICE%"=="3"  goto :stop_all
+if "%CHOICE%"=="4"  goto :status
+if "%CHOICE%"=="5"  goto :rebuild
+if "%CHOICE%"=="6"  goto :partner_info
+if "%CHOICE%"=="7"  goto :distribute
+if /i "%CHOICE%"=="D" goto :mysql_start
+if /i "%CHOICE%"=="F" goto :mysql_foreground
+if /i "%CHOICE%"=="E" goto :mysql_stop
+if "%CHOICE%"=="0"  goto :end
+echo Unknown option.
+pause
+goto :menu
+
+:: =================================================================
+:mysql_foreground
+cls
+echo === MySQL Start (Foreground, No Admin) ===
+echo.
+if not exist "mysql-portable\bin\mysqld.exe" (
+    echo mysql-portable\ not found.
+    pause
+    goto :menu
+)
+
+"mysql-portable\bin\mysqladmin.exe" -u root --protocol=TCP ping 2>nul | findstr "alive" >nul
+if %errorlevel% equ 0 (
+    echo MySQL already running.
+    pause
+    goto :menu
+)
+
+pushd mysql-portable
+set "MYSQL_DIR=%CD%"
+set "AUTO_INI=%MYSQL_DIR%\my.ini.auto"
+> "%AUTO_INI%" (
+    for /f "usebackq delims=" %%l in ("my.ini") do (
+        set "line=%%l"
+        set "line=!line:CURRENT_DIR=%MYSQL_DIR%!"
+        echo !line!
+    )
+)
+echo Starting MySQL in foreground window...
+:: Write temp launcher bat to avoid nested-quote hell
+> "%MYSQL_DIR%\_run_mysql.bat" (
+    echo @echo off
+    echo chcp 65001 ^>nul
+    echo cd /d "%MYSQL_DIR%"
+    echo start "EduMgmt MySQL" /MIN "%MYSQL_DIR%\bin\mysqld.exe" --defaults-file="%AUTO_INI%" --console
+)
+call "%MYSQL_DIR%\_run_mysql.bat"
+del "%MYSQL_DIR%\_run_mysql.bat" 2>nul
+popd
+
+echo Waiting for MySQL...
+set "ATTEMPTS=0"
+:wait_mysql_fg
+timeout /t 1 /nobreak >nul
+set /a ATTEMPTS+=1
+"mysql-portable\bin\mysqladmin.exe" -u root --protocol=TCP ping 2>nul | findstr "alive" >nul
+if %errorlevel% equ 0 goto :mysql_fg_ready
+if %ATTEMPTS% geq 20 goto :mysql_fg_timeout
+goto :wait_mysql_fg
+
+:mysql_fg_ready
+echo MySQL is ready (foreground mode).
+pause
+goto :menu
+
+:mysql_fg_timeout
+echo MySQL did not start within 20s. Check the MySQL window.
+pause
+goto :menu
+
+:: =================================================================
+:mysql_start
+cls
+echo === MySQL Start (Service, Admin Required) ===
+echo.
+
+echo Checking service status...
+sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul
+if %errorlevel% equ 0 (
+    echo MySQL-EduMgmt already running.
+    pause
+    goto :menu
+)
+
+net start MySQL-EduMgmt 2>nul
+if %errorlevel% equ 0 (
+    echo MySQL-EduMgmt started.
+    pause
+    goto :menu
+)
+
+net start MySQL80 2>nul
+if %errorlevel% equ 0 (
+    echo MySQL80 started.
+    pause
+    goto :menu
+)
+
+if not exist "mysql-portable\bin\mysqld.exe" (
+    echo mysql-portable\ not found. See MYSQL_SETUP_GUIDE.md.
+    pause
+    goto :menu
+)
+
+echo Installing MySQL-EduMgmt service from mysql-portable...
+pushd mysql-portable
+set "MYSQL_DIR=%CD%"
+set "AUTO_INI=%MYSQL_DIR%\my.ini.auto"
+> "%AUTO_INI%" (
+    for /f "usebackq delims=" %%l in ("my.ini") do (
+        set "line=%%l"
+        set "line=!line:CURRENT_DIR=%MYSQL_DIR%!"
+        echo !line!
+    )
+)
+.\bin\mysqld.exe --install MySQL-EduMgmt --defaults-file="%AUTO_INI%" 2>nul
+if %errorlevel% neq 0 (
+    echo.
+    echo Install failed. You need Administrator privileges.
+    echo Right-click server_control.bat ^> Run as Administrator.
+    popd
+    pause
+    goto :menu
+)
+net start MySQL-EduMgmt 2>nul
+if %errorlevel% equ 0 (
+    echo MySQL-EduMgmt installed and started.
+) else (
+    echo Service installed but failed to start. Check my.ini paths.
+)
+popd
+pause
+goto :menu
+
+:: =================================================================
+:mysql_stop
+cls
+echo Stopping MySQL...
+taskkill /FI "WINDOWTITLE eq EduMgmt MySQL" /F 2>nul
+net stop MySQL-EduMgmt 2>nul
+net stop MySQL80 2>nul
+net stop MariaDB 2>nul
+echo Done.
 pause
 goto :menu
 
 :: =================================================================
 :start_local
-:: =================================================================
-start "EduMgmt Flask [localhost]" python run.py
+cls
+echo === Start Server (localhost) ===
 echo.
-echo   Server starting at http://localhost:5000
-echo   This window will stay open. Press R then Enter to return to menu.
-echo.
-set /p X=""
+sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul
+if %errorlevel% neq 0 (
+    "mysql-portable\bin\mysqladmin.exe" -u root --protocol=TCP ping 2>nul | findstr "alive" >nul
+    if %errorlevel% neq 0 (
+        echo [WARNING] MySQL is not running.
+        echo Start it first: [D] or [F] from main menu.
+        echo.
+    )
+)
+echo Starting Flask at http://localhost:5000 ...
+start "EduMgmt Flask" python run.py
+echo Done.
+pause
 goto :menu
 
 :: =================================================================
 :start_public
-:: =================================================================
+cls
+echo === Start Server (LAN Public) ===
 echo.
-echo   Starting server in PUBLIC mode (LAN + IPv6)...
-echo.
-echo     Local: http://localhost:5000
-echo     LAN:   http://%LOCAL_IP%:5000
-if not "%IPV6%"=="" echo     IPv6:   http://[%IPV6%]:5000
-echo.
-echo   Make sure firewall port 5000 is OPEN!
-echo.
-
-:: Auto-open firewall if needed (best-effort)
-netsh advfirewall firewall show rule name="EduMgmt Flask 5000" 2>nul | findstr /i "Enabled" >nul
+sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul
 if %errorlevel% neq 0 (
-    echo   Adding firewall rule for port 5000...
-    netsh advfirewall firewall add rule name="EduMgmt Flask 5000" dir=in action=allow protocol=TCP localport=5000 >nul 2>&1
+    "mysql-portable\bin\mysqladmin.exe" -u root --protocol=TCP ping 2>nul | findstr "alive" >nul
+    if %errorlevel% neq 0 (
+        echo [WARNING] MySQL is not running.
+        echo Start it first: [D] or [F] from main menu.
+        echo.
+    )
 )
-
-start "EduMgmt Flask [public]" python run.py --public
-
-echo   Server is running in a separate window.
-echo   Press R then Enter to return to this menu.
+echo Opening firewall port 5000...
+netsh advfirewall firewall add rule name="EduMgmt Flask 5000" dir=in action=allow protocol=TCP localport=5000 >nul 2>&1
 echo.
-set /p X=""
+echo   Local : http://localhost:5000
+echo   LAN   : http://%LOCAL_IP%:5000
+echo.
+start "EduMgmt Flask" python run.py --public
+echo Done.
+pause
 goto :menu
 
 :: =================================================================
-:stop
-:: =================================================================
-echo.
-echo   Stopping all server processes...
-for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq python.exe" /FO TABLE /NH 2^>nul') do (
-    echo   Stopping python.exe PID=%%a
-    taskkill /F /PID %%a >nul 2>&1
-)
-for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq ngrok.exe" /FO TABLE /NH 2^>nul') do (
-    taskkill /F /PID %%a >nul 2>&1
-)
-for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq frpc.exe" /FO TABLE /NH 2^>nul') do (
-    taskkill /F /PID %%a >nul 2>&1
-)
-echo   Done.
-echo   Press R then Enter to return to menu.
-set /p X=""
+:stop_all
+echo Stopping all EduMgmt processes...
+taskkill /FI "WINDOWTITLE eq EduMgmt Flask" /F 2>nul
+taskkill /FI "WINDOWTITLE eq EduMgmt MySQL" /F 2>nul
+echo Done.
+pause
 goto :menu
 
 :: =================================================================
 :status
-:: =================================================================
 cls
+echo === Status ===
 echo.
-echo   ============================================================
-echo     SERVER STATUS
-echo   ============================================================
+tasklist 2>nul | findstr "EduMgmt" >nul && echo EduMgmt processes : RUNNING || echo EduMgmt processes : STOPPED
+sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul && echo MySQL-EduMgmt     : RUNNING
+sc query MySQL80       2>nul | findstr RUNNING >nul && echo MySQL80            : RUNNING
+sc query MariaDB       2>nul | findstr RUNNING >nul && echo MariaDB            : RUNNING
+"mysql-portable\bin\mysqladmin.exe" -u root --protocol=TCP ping 2>nul | findstr "alive" >nul && echo MySQL foreground   : RUNNING
 echo.
-
-set "PY_COUNT=0"
-for /f "tokens=1" %%a in ('tasklist /FI "IMAGENAME eq python.exe" /FO TABLE /NH 2^>nul') do set /a PY_COUNT+=1
-if %PY_COUNT% gtr 0 (
-    echo   Flask Server   : RUNNING
-    echo     Local: http://localhost:5000
-    echo     LAN:   http://%LOCAL_IP%:5000
-    if not "%IPV6%"=="" echo     IPv6:   http://[%IPV6%]:5000
-) else (
-    echo   Flask Server   : STOPPED
-)
-
+netsh advfirewall firewall show rule name="EduMgmt Flask 5000" 2>nul | findstr Enabled >nul && echo Firewall          : Port 5000 OPEN || echo Firewall          : Port 5000 NO RULE
+echo LAN IPv4         : %LOCAL_IP%
 echo.
-echo   ---- Firewall ----
-netsh advfirewall firewall show rule name="EduMgmt Flask 5000" 2>nul | findstr /i "Enabled" >nul
-if %errorlevel% equ 0 (echo   Port 5000 TCP: OPEN) else (echo   Port 5000 TCP: NO RULE (use [2] to auto-add))
-
-echo.
-echo   ---- Database ----
-sc query MSSQL$SQLEXPRESS 2>nul | findstr "RUNNING" >nul && echo   SQL Server (SQLEXPRESS): RUNNING
-sc query MSSQLSERVER 2>nul | findstr "RUNNING" >nul && echo   SQL Server (MSSQLSERVER): RUNNING
-sc query MSSQL$SQLEXPRESS 2>nul | findstr "STOPPED" >nul && echo   SQL Server: STOPPED
-sc query MSSQLSERVER 2>nul | findstr "STOPPED" >nul && echo   SQL Server: STOPPED
-
-echo.
-echo   ---- Network ----
-echo     LAN IPv4 : %LOCAL_IP%
-if not "%IPV6%"=="" echo     IPv6     : %IPV6%
-for /f "tokens=*" %%p in ('curl -s --connect-timeout 3 ifconfig.me 2^>nul') do (
-    if not "%%p"=="" echo     Public IP: %%p
-)
-
-echo.
-echo   Press R then Enter to return to menu.
-set /p X=""
+pause
 goto :menu
 
 :: =================================================================
 :rebuild
-:: =================================================================
-echo.
-echo   Building frontend...
+cls
+echo Building frontend...
 cd frontend
 call npm run build
 cd ..
-echo   Done. Starting server (public)...
-start "EduMgmt Flask [public]" python run.py --public
-echo   Press R then Enter to return to menu.
-set /p X=""
+echo Starting server (public)...
+start "EduMgmt Flask" python run.py --public
+echo Done.
+pause
 goto :menu
 
 :: =================================================================
 :partner_info
-:: =================================================================
 cls
 echo.
-echo   +==================================================+
-echo   ^|       PARTNER CONNECTION INFO                    ^|
-echo   +==================================================+
-echo   ^|                                                  ^|
-echo   ^|  LAN (same network):                             ^|
-echo   ^|    http://%LOCAL_IP%:5000                       ^|
-if not "%IPV6%"=="" (
-echo   ^|                                                  ^|
-echo   ^|  IPv6 (campus network / internet):              ^|
-echo   ^|    http://[%IPV6%]:5000                         ^|
-)
-echo   ^|                                                  ^|
-echo   ^|  Accounts:                                       ^|
-echo   ^|    admin  / 123456                               ^|
-echo   ^|    T001   / 123456  (teacher)                    ^|
-echo   ^|    STU001 / 123456  (student)                    ^|
-echo   ^|                                                  ^|
-echo   ^|  Partner tools:                                  ^|
-echo   ^|    partner_connect.bat - auto proxy setup        ^|
-echo   ^|    SETUP_PARTNER.md  - full guide               ^|
-echo   +==================================================+
-
-:: Public WAN IP
-for /f "tokens=*" %%p in ('curl -s --connect-timeout 3 ifconfig.me 2^>nul') do (
-    if not "%%p"=="" (
-        echo.
-        echo   Public WAN IP detected: %%p
-        echo   If port forwarding is set up: http://%%p:5000
-    )
-)
-
+echo   LAN:  http://%LOCAL_IP%:5000
 echo.
-echo   Press R then Enter to return to menu.
-set /p X=""
+echo   Accounts:
+echo     admin  / 123456
+echo     T001   / 123456 (teacher)
+echo     STU001 / 123456 (student)
+echo.
+pause
 goto :menu
 
 :: =================================================================
 :distribute
-:: =================================================================
-echo.
-echo   Packaging project (excludes node_modules, .git, __pycache__)...
-set "PACKAGE_NAME=edu-mgmt-dist.zip"
-set "PACKAGE_DIR=%PROJECT_DIR%..\edu-mgmt-dist"
-
-if exist "%PACKAGE_DIR%" rmdir /s /q "%PACKAGE_DIR%"
-mkdir "%PACKAGE_DIR%"
-
-robocopy "%PROJECT_DIR%" "%PACKAGE_DIR%" /E /NFL /NDL /NJH /NJS /XD node_modules __pycache__ .git .claude .vscode .idea /XF *.pyc *.bak .env >nul
-if %errorlevel% geq 8 echo   Warning: some copy errors, continuing...
-
-if exist "%PACKAGE_DIR%\backend\config\config.ini" del "%PACKAGE_DIR%\backend\config\config.ini"
-if exist "%PACKAGE_DIR%\backend\config\config.ini.example" (
-    copy "%PACKAGE_DIR%\backend\config\config.ini.example" "%PACKAGE_DIR%\backend\config\config.ini" >nul
-)
-
-powershell -Command "Compress-Archive -Path '%PACKAGE_DIR%\*' -DestinationPath '%PROJECT_DIR%..\%PACKAGE_NAME%' -Force" 2>nul
-rmdir /s /q "%PACKAGE_DIR%"
-
-echo.
-echo   Package: %PROJECT_DIR%..\%PACKAGE_NAME%
-echo.
-echo   Partner steps:
-echo   1. Extract zip
-echo   2. Run: partner_connect.bat
-echo   3. Choose [2] IPv6 or [1] LAN
-echo.
-echo   Press R then Enter to return to menu.
-set /p X=""
-goto :menu
-
-:: =================================================================
-:ipv6_guide
-:: =================================================================
 cls
+echo ============================================================
+echo   Package for Partner Distribution
+echo ============================================================
 echo.
-echo   +==========================================================+
-echo   ^|   IPv6 DIRECT ACCESS - Setup and Test                   ^|
-echo   +==========================================================+
+echo This creates a self-contained zip that partners can unzip
+echo and run with double-click on start_all.bat.
 echo.
-echo   China campus networks almost always have IPv6.
-echo   Every device gets its own PUBLIC IPv6 address,
-echo   so NO port mapping or third-party tools needed!
-echo.
-echo   ---- Step 1: Check your IPv6 ----
+echo What is included:
+echo   - Full project source (backend + frontend)
+echo   - mysql-portable with pre-loaded database
+echo   - start_all.bat (one-click launch)
 echo.
 
-if "%IPV6%"=="" (
-    echo   [WARNING] No public IPv6 detected!
-    echo.
-    echo   Possible reasons:
-    echo   - Your network does not have IPv6 (rare in Chinese campuses)
-    echo   - IPv6 is disabled in Windows network adapter
-    echo.
-    echo   To enable IPv6:
-    echo   1. Control Panel - Network and Sharing Center
-    echo   2. Click your network connection
-    echo   3. Properties - check "Internet Protocol Version 6 (TCP/IPv6)"
-    echo   4. OK, wait a few seconds, then re-run this tool
-) else (
-    echo   Your IPv6: %IPV6%
-    echo.
-    echo   TEST IT: Open this in your browser:
-    echo     http://[%IPV6%]:5000
-    echo.
+set /p CONFIRM="Continue? (Y/N): "
+if /i not "%CONFIRM%"=="Y" goto :menu
 
-    :: Quick self-test
-    if %PY_COUNT% gtr 0 (
-        curl -s -o nul --connect-timeout 3 "http://[%IPV6%]:5000" 2>nul && (
-            echo   [OK] IPv6 self-test PASSED - server reachable
-        ) || (
-            echo   [INFO] Self-test inconclusive (server may need --public mode)
-        )
+echo.
+echo [1/3] Purging machine-specific data from mysql-portable...
+if exist "mysql-portable\data\auto.cnf" del "mysql-portable\data\auto.cnf"
+for %%f in ("mysql-portable\data\*.err") do if exist "%%f" del "%%f"
+if exist "mysql-portable\my.ini.auto" del "mysql-portable\my.ini.auto"
+pushd mysql-portable
+if exist "data\" (
+    .\bin\mysqladmin.exe -u root --protocol=TCP ping 2>nul | findstr "alive" >nul
+    if %errorlevel% equ 0 (
+        .\bin\mysql.exe -u root --protocol=TCP -e "RESET MASTER;" 2>nul
+        .\bin\mysql.exe -u root --protocol=TCP -e "FLUSH LOGS;" 2>nul
+        echo Binary logs purged.
+    ) else (
+        echo MySQL not running, skipping binary log purge.
     )
 )
+popd
 
 echo.
-echo   ---- Step 2: Partner tests your IPv6 ----
-echo.
-echo   Partner should:
-if not "%IPV6%"=="" echo   1. Open: http://[%IPV6%]:5000
-echo   2. Or run partner_connect.bat and choose [2] IPv6
-echo   3. Enter the IPv6 address (WITHOUT brackets, script adds them)
-echo.
-echo   ---- Step 3: If partner cannot connect ----
-echo.
-echo   1. Windows Firewall must allow port 5000 on IPv6:
-echo      netsh advfirewall firewall add rule name="EduMgmt IPv6" dir=in action=allow protocol=TCP localport=5000
-echo.
-echo   2. Partner's network must also have IPv6. Test:
-echo      On partner's PC, open https://test-ipv6.com
-echo      If it shows "IPv6 not supported", partner needs to enable IPv6
-echo.
-echo   3. Some campus firewalls may block incoming IPv6 connections.
-echo      If so, try option [B] for alternatives.
-echo.
-echo   ---- IPv6 privacy note ----
-echo   Windows may change your IPv6 address periodically
-echo   (privacy extensions). If the address keeps changing:
-echo   Run in admin PowerShell:
-echo     Set-NetIPv6Protocol -RandomizeIdentifiers Disabled
-echo.
-echo   +==========================================================+
+echo [2/3] Copying project files...
+set "PKG=%CD%\..\edu-mgmt-dist"
+if exist "%PKG%" rmdir /s /q "%PKG%"
+robocopy "%CD%" "%PKG%" /E /NFL /NDL /NJH /NJS /XD node_modules __pycache__ .git .claude .vscode .idea /XF *.pyc *.bak .env >nul
+if exist "%PKG%\backend\config\config.ini" del "%PKG%\backend\config\config.ini"
+if exist "%PKG%\backend\config\config.ini.example" copy "%PKG%\backend\config\config.ini.example" "%PKG%\backend\config\config.ini" >nul
+echo Copy complete.
 
 echo.
-echo   Press R then Enter to return to menu.
-set /p X=""
+echo [3/3] Creating zip archive...
+powershell -Command "Compress-Archive -Path '%PKG%\*' -DestinationPath '%CD%\..\edu-mgmt-dist.zip' -Force" 2>nul
+rmdir /s /q "%PKG%"
+echo.
+echo ============================================================
+echo   Done: ..\edu-mgmt-dist.zip
+echo.
+echo   Partner instructions:
+echo     1. Unzip to any directory
+echo     2. Install Python 3.11+ (one-time)
+echo     3. Double-click start_all.bat
+echo     4. Open http://localhost:5000
+echo ============================================================
+pause
 goto :menu
 
 :: =================================================================
-:ext_access_guide
-:: =================================================================
-cls
-echo.
-echo   +==========================================================+
-echo   ^|   ALL EXTERNAL ACCESS OPTIONS                           ^|
-echo   +==========================================================+
-echo.
-echo   RECOMMENDED ORDER for Chinese campus networks:
-echo.
-echo   1. IPv6 direct [option A]
-echo      Zero config, already built-in, best for campus
-echo.
-echo   2. Same campus network LAN
-echo      If both on the same campus subnet, just use [2]
-echo      URL: http://%LOCAL_IP%:5000
-echo.
-echo   3. Router port forwarding (for home broadband)
-echo      Login to router admin (192.168.1.1 etc.)
-echo      Port Forward: external 5000 -^> %LOCAL_IP%:5000 TCP
-echo      Then use: http://YOUR_PUBLIC_IP:5000
-echo.
-echo   4. ZeroTier virtual LAN (free, 25 devices)
-echo      https://www.zerotier.com/
-echo      Both install client, join same network, get virtual IP
-echo.
-echo   5. frp self-hosted tunnel (need cloud server ~10 CNY/month)
-echo      https://github.com/fatedier/frp/releases
-echo      Server: Alibaba Cloud / Tencent Cloud student pricing
-echo.
-echo   6. Cloudflare Tunnel (free, needs a domain name)
-echo      https://developers.cloudflare.com/cloudflare-one/
-echo.
-echo   7. ngrok (free tier, limited bandwidth, URL changes)
-echo      https://ngrok.com/download
-echo.
-echo   +==========================================================+
-
-echo.
-echo   Press R then Enter to return to menu.
-set /p X=""
-goto :menu
-
-:: =================================================================
-:start_external
-:: =================================================================
-echo.
-echo   Starting server for EXTERNAL ACCESS...
-echo.
-echo   The server will listen on ALL network interfaces.
-
-:: Firewall
-netsh advfirewall firewall show rule name="EduMgmt Flask 5000" 2>nul | findstr /i "Enabled" >nul
-if %errorlevel% neq 0 (
-    echo   Adding Windows Firewall rule for port 5000...
-    netsh advfirewall firewall add rule name="EduMgmt Flask 5000" dir=in action=allow protocol=TCP localport=5000 >nul 2>&1
-)
-
-echo.
-echo   When ready, your partner can connect via:
-echo     LAN:  http://%LOCAL_IP%:5000
-if not "%IPV6%"=="" echo     IPv6:  http://[%IPV6%]:5000
-echo.
-echo   Server starting in a NEW WINDOW...
-echo   Close that window or use [3] to stop.
-echo   This menu will stay open.
-
-start "EduMgmt Flask [external]" python run.py --public
-
-echo.
-echo   Press R then Enter to return to menu.
-set /p X=""
-goto :menu
-
 :end
 endlocal

@@ -146,8 +146,8 @@ class AdminController:
                     return {"success": False, "message": "学生不存在"}
 
                 # Delete UserAccount FIRST (parent), then Student (child).
-                # Student FK -> user_account is ON DELETE CASCADE, but
-                # explicit order prevents double-delete contention on MSSQL.
+                # Student FK -> user_account is ON DELETE CASCADE.
+                # Explicit order prevents double-delete contention.
                 account = session.query(UserAccount).filter_by(
                     user_id=student_id).first()
                 if account:
@@ -176,8 +176,14 @@ class AdminController:
                 ip_address=ip_address,
             )
             session.add(log_entry)
-        except Exception as e:
-            logger.warning(f"操作日志写入失败: {e}")
+            session.flush()
+        except Exception:
+            try:
+                session.rollback()
+                session.expunge(log_entry)
+            except Exception:
+                pass
+            logger.warning(f"操作日志写入失败（已跳过）: user={user_id} {operation}")
 
     # ----- Teacher management -----
 
