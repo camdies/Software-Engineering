@@ -225,17 +225,9 @@ goto :menu
 cls
 echo === Start Server (localhost) ===
 echo.
+call :ensure_mysql
 call :ensure_config
 
-"mysql-portable\bin\mysqladmin.exe" -u root -pCairenbin2005 --protocol=TCP ping 2>nul | findstr "alive" >nul
-if %errorlevel% neq 0 (
-    sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul
-    if %errorlevel% neq 0 (
-        echo [WARNING] MySQL is not running.
-        echo Start it first: [D] or [F] from main menu.
-        echo.
-    )
-)
 echo Starting Flask at http://localhost:5000 ...
 start "EduMgmt Flask" python run.py
 echo Done.
@@ -247,17 +239,9 @@ goto :menu
 cls
 echo === Start Server (LAN Public) ===
 echo.
+call :ensure_mysql
 call :ensure_config
 
-"mysql-portable\bin\mysqladmin.exe" -u root -pCairenbin2005 --protocol=TCP ping 2>nul | findstr "alive" >nul
-if %errorlevel% neq 0 (
-    sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul
-    if %errorlevel% neq 0 (
-        echo [WARNING] MySQL is not running.
-        echo Start it first: [D] or [F] from main menu.
-        echo.
-    )
-)
 echo Opening firewall port 5000...
 netsh advfirewall firewall add rule name="EduMgmt Flask 5000" dir=in action=allow protocol=TCP localport=5000 >nul 2>&1
 echo.
@@ -321,6 +305,64 @@ echo     STU001 / 123456 (student)
 echo.
 pause
 goto :menu
+
+:: =================================================================
+:ensure_mysql
+"mysql-portable\bin\mysqladmin.exe" -u root -pCairenbin2005 --protocol=TCP ping 2>nul | findstr "alive" >nul
+if %errorlevel% equ 0 exit /b
+
+sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul
+if %errorlevel% equ 0 exit /b
+
+echo [INFO] MySQL is not running. Starting MySQL foreground...
+pushd mysql-portable
+set "MYSQL_DIR=%CD%"
+set "AUTO_INI=%MYSQL_DIR%\my.ini.auto"
+
+:: Auto-init if data/ missing
+if not exist "data\" (
+    mkdir data
+    .\bin\mysqld.exe --defaults-file="%AUTO_INI%" --initialize-insecure --console
+    if %errorlevel% neq 0 (
+        echo [ERROR] MySQL init failed.
+        popd
+        exit /b 1
+    )
+    start "EduMgmt MySQL Init" /MIN .\bin\mysqld.exe --defaults-file="%AUTO_INI%" --console
+    set "AT=0"
+    :em_wait_init
+    timeout /t 1 /nobreak >nul
+    set /a AT+=1
+    if !AT! geq 30 ( popd & echo [ERROR] MySQL failed to start. & exit /b 1 )
+    .\bin\mysql.exe -u root --protocol=TCP -e "SELECT 1;" 2>nul | findstr "1" >nul || goto :em_wait_init
+    .\bin\mysql.exe -u root --protocol=TCP -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'Cairenbin2005'; FLUSH PRIVILEGES;" 2>nul
+    chcp 65001 >nul
+    pushd ..
+    type backend\config\init_database_mysql.sql | .\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 --default-character-set=utf8mb4 2>nul
+    popd
+    chcp 936 >nul
+    .\bin\mysqladmin.exe -u root -pCairenbin2005 --protocol=TCP shutdown 2>nul
+    timeout /t 2 /nobreak >nul
+)
+
+> "%AUTO_INI%" (
+    for /f "usebackq delims=" %%l in ("my.ini") do (
+        set "line=%%l"
+        set "line=!line:CURRENT_DIR=%MYSQL_DIR%!"
+        echo !line!
+    )
+)
+start "EduMgmt MySQL" /MIN .\bin\mysqld.exe --defaults-file="%AUTO_INI%" --console
+popd
+
+set "ATTEMPTS=0"
+:em_wait
+timeout /t 1 /nobreak >nul
+set /a ATTEMPTS+=1
+"mysql-portable\bin\mysql.exe" -u root -pCairenbin2005 --protocol=TCP -e "SELECT 1;" 2>nul | findstr "1" >nul
+if %errorlevel% equ 0 exit /b
+if %ATTEMPTS% geq 20 exit /b
+goto :em_wait
 
 :: =================================================================
 :ensure_config
