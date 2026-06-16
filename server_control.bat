@@ -157,10 +157,12 @@ if %errorlevel% equ 0 (echo   Port 5000 TCP: OPEN) else (echo   Port 5000 TCP: N
 
 echo.
 echo   ---- Database ----
+sc query MySQL80 2>nul | findstr "RUNNING" >nul && echo   MySQL 8.0: RUNNING
+sc query MariaDB 2>nul | findstr "RUNNING" >nul && echo   MariaDB: RUNNING
+sc query MySQL80 2>nul | findstr "STOPPED" >nul && echo   MySQL: STOPPED
+sc query MariaDB 2>nul | findstr "STOPPED" >nul && echo   MariaDB: STOPPED
 sc query MSSQL$SQLEXPRESS 2>nul | findstr "RUNNING" >nul && echo   SQL Server (SQLEXPRESS): RUNNING
 sc query MSSQLSERVER 2>nul | findstr "RUNNING" >nul && echo   SQL Server (MSSQLSERVER): RUNNING
-sc query MSSQL$SQLEXPRESS 2>nul | findstr "STOPPED" >nul && echo   SQL Server: STOPPED
-sc query MSSQLSERVER 2>nul | findstr "STOPPED" >nul && echo   SQL Server: STOPPED
 
 echo.
 echo   ---- Network ----

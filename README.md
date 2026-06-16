@@ -43,8 +43,8 @@
 |------|------|
 | 前端 | Vue.js 3 + Element Plus + Vite |
 | 后端 API | Flask + JWT |
-| 数据访问 | SQLAlchemy / pyodbc / pymssql |
-| 数据库 | SQL Server / MySQL |
+| 数据访问 | SQLAlchemy + PyMySQL |
+| 数据库 | MySQL 8.0+ (默认) / SQL Server (可选) |
 
 ---
 
@@ -52,22 +52,41 @@
 
 - Python 3.11+
 - Node.js 18+ (前端开发需要)
-- SQL Server（配置见 [SQL_SERVER_SETUP_GUIDE.md](./SQL_SERVER_SETUP_GUIDE.md)）
+- MySQL 8.0+（配置见 [MYSQL_SETUP_GUIDE.md](./MYSQL_SETUP_GUIDE.md)）
 
 ---
 
 ## 快速开始
 
-### 1. 配置数据库
+### 1. 安装并配置 MySQL
 
-参考 [SQL_SERVER_SETUP_GUIDE.md](./SQL_SERVER_SETUP_GUIDE.md) 安装并配置 SQL Server，
-然后在 SSMS 中执行 `backend/config/init_database.sql`（新版 v3.0，包含 class_period 和 semester_config 新表）。
+参考 **[MYSQL_SETUP_GUIDE.md](./MYSQL_SETUP_GUIDE.md)** — 完整指引：下载 → 安装 → 初始化 → 嵌入项目目录。
 
-### 2. 修改数据库连接
+### 2. 初始化数据库
 
-将 `backend/config/config.ini.example` 复制为 `backend/config/config.ini`，编辑其中的数据库连接信息。
+```powershell
+# 方法一：用 MySQL 客户端执行 DDL 脚本
+mysql -u root -p < backend\config\init_database_mysql.sql
 
-### 3. 安装依赖并启动
+# 方法二：首次启动 Flask 时自动建表
+# app_factory.py 的 @before_request 会在首次请求时调用
+# Base.metadata.create_all() 自动创建所有表（不含测试数据）
+```
+
+### 3. 修改数据库连接
+
+将 `backend/config/config.ini.example` 复制为 `backend/config/config.ini`，编辑其中的数据库连接信息：
+```ini
+[database]
+driver = mysql
+host = localhost
+port = 3306
+user = root
+password = YOUR_MYSQL_PASSWORD
+database = course_management_db
+```
+
+### 4. 安装依赖并启动
 
 ```powershell
 # Python 依赖
@@ -86,7 +105,7 @@ python run.py
 
 浏览器访问 `http://localhost:5000`
 
-### 4. 前端开发模式（可选）
+### 5. 前端开发模式（可选）
 
 ```powershell
 cd frontend
@@ -173,7 +192,7 @@ course_selection_system/
 ├── tests/
 ├── run.py
 ├── README.md
-└── SQL_SERVER_SETUP_GUIDE.md
+└── MYSQL_SETUP_GUIDE.md
 ```
 
 ---

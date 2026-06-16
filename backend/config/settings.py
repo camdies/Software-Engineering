@@ -1,8 +1,8 @@
 """
 backend/config/settings.py - 配置读取模块
 
-支持 SQL Server 和 MySQL 双驱动，通过 config.ini [database] 段中的
-driver 字段自动切换（默认 mssql）。
+支持 MySQL (PyMySQL) 和 SQL Server (pyodbc) 双驱动，
+通过 config.ini [database] 段中的 driver 字段自动切换（默认 mysql）。
 """
 
 import os
@@ -38,13 +38,13 @@ class Settings:
             dict: host, port, driver(mssql|mysql), user, password, database, pool_size
         """
         return {
-            "driver": self._config.get("database", "driver", fallback="mssql"),
+            "driver": self._config.get("database", "driver", fallback="mysql"),
             "host": self._config.get("database", "host", fallback="localhost"),
-            "port": self._config.getint("database", "port", fallback=1433),
-            "user": self._config.get("database", "user", fallback="sa"),
+            "port": self._config.getint("database", "port", fallback=3306),
+            "user": self._config.get("database", "user", fallback="root"),
             "password": self._config.get("database", "password", fallback=""),
             "database": self._config.get("database", "database",
-                                          fallback="CourseManagementDB"),
+                                          fallback="course_management_db"),
             "pool_size": self._config.getint("database", "pool_size", fallback=10),
         }
 
@@ -67,7 +67,7 @@ class Settings:
             str: 数据库连接字符串。
         """
         db = self.database
-        driver = db.get("driver", "mssql")
+        driver = db.get("driver", "mysql")
 
         if driver == "mysql":
             return (
@@ -76,7 +76,7 @@ class Settings:
                 "?charset=utf8mb4"
             )
 
-        # 默认 SQL Server — 优先使用 pyodbc + ODBC Driver 18
+        # SQL Server (ODBC Driver 18)
         # AutoTranslate=No 禁止 pyodbc 将 UCS-2 经 ANSI 代码页转换，
         # 避免非中文系统上 N(VAR)CHAR 中文字段被损坏。
         return (
