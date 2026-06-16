@@ -18,8 +18,8 @@
 │   - 任何 CDN          │                     │  Flask (Waitress)        │
 │                      │                     │   └─ :5000               │
 │                      │                     │                          │
-│                      │                     │  SQL Server 2022 Express  │
-│                      │                     │   └─ :1433               │
+│                      │                     │  MySQL 8.0               │
+│                      │                     │   └─ :3306               │
 └─────────────────────┘                     └──────────────────────────┘
 ```
 
@@ -33,7 +33,7 @@
 2. 选择配置：
    - **系统镜像**: Windows Server 2022 数据中心版
    - **CPU**: 2核及以上
-   - **内存**: 4GB 及以上（SQL Server 需要）
+   - **内存**: 2GB 及以上（MySQL 建议 4GB）
    - **带宽**: 3Mbps 及以上
 3. 购买后获取：**公网 IP**、**Administrator 密码**
 
@@ -49,12 +49,8 @@ git pull origin main
 ```
 双击 server_control.bat → [7] 打包分发给伙伴
 ```
-或手动打包：
-```powershell
-powershell -Command "Compress-Archive -Path 'backend','requirements.txt','requirements_web.txt','run.py','run_prod.py','README.md','API.md' -DestinationPath 'edu-mgmt-backend.zip' -Force"
-```
 
-3. 准备好 `backend\config\init_database.sql` 脚本文件
+3. 准备好 `backend\config\init_database_mysql.sql` 脚本文件
 
 ---
 
@@ -76,55 +72,47 @@ Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.11.9/python-3.11.9-a
 .\python-installer.exe /quiet InstallAllUsers=1 PrependPath=1
 ```
 
-### 3.3 安装 SQL Server 2022 Express
+### 3.3 安装 MySQL 8.0
 
 ```powershell
-# 下载 SQL Server Express
-Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?linkid=2216014" -OutFile "SQL2022-SSEI-Expr.exe"
+# 下载 MySQL 8.0 Installer
+Invoke-WebRequest -Uri "https://dev.mysql.com/get/Downloads/MySQLInstaller/mysql-installer-community-8.0.36.0.msi" -OutFile "mysql-installer.msi"
 
-# 运行安装
-.\SQL2022-SSEI-Expr.exe
+# 安装（静默模式）
+msiexec /i mysql-installer.msi /quiet
 ```
 
-安装选项：
-- 选择 **"基本"** 安装类型
-- 记录 **sa 密码**
-- 安装完成后，安装 **SSMS**（会自动提示）
+安装完成后：
+1. 运行 MySQL Installer → 选择 "Developer Default" 或 "Server only"
+2. 设置 **root 密码**
+3. 确保 MySQL 服务 (MySQL80) 已启动
 
-### 3.4 配置 SQL Server
-
-1. 打开 **SQL Server 配置管理器**
-2. SQL Server 网络配置 → MSSQLSERVER 的协议 → **启用 TCP/IP**
-3. 右键 TCP/IP → 属性 → IP 地址 → 拉到最底部 IPALL → **TCP 端口: 1433**
-4. 重启 SQL Server 服务
-
-### 3.5 初始化数据库
-
-1. 复制 `edu-mgmt-backend.zip` 到服务器，解压到 `C:\edu-mgmt\`
-2. 复制 `init_database.sql` 到服务器
-3. 打开 SSMS，连接到 `localhost`（sa + 你的密码）
-4. **文件 → 打开 → init_database.sql → F5 执行**
-5. 验证：`SELECT * FROM user_account` 应能看到 admin/T001/STU001 等账号
-
-### 3.6 安装 ODBC Driver 18
+### 3.4 初始化数据库
 
 ```powershell
-Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?linkid=2217878" -OutFile "msodbcsql.msi"
-msiexec /i msodbcsql.msi /quiet IACCEPTMSODBCSQLLICENSETERMS=YES
+cd C:\edu-mgmt
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
+Get-Content backend\config\init_database_mysql.sql -Encoding UTF8 | mysql -u root -p --default-character-set=utf8mb4
 ```
 
-### 3.7 配置项目连接
+验证：
+```powershell
+mysql -u root -p -e "USE course_management_db; SELECT * FROM user_account;"
+```
+应能看到 admin/T001/STU001 等账号。
+
+### 3.5 配置项目连接
 
 编辑 `C:\edu-mgmt\backend\config\config.ini.example`，重命名为 `config.ini`：
 
 ```ini
 [database]
-driver = mssql
+driver = mysql
 host = localhost
-port = 1433
-user = sa
-password = YOUR_SA_PASSWORD
-database = CourseManagementDB
+port = 3306
+user = root
+password = YOUR_MYSQL_PASSWORD
+database = course_management_db
 pool_size = 10
 
 [system]
@@ -146,7 +134,7 @@ close_time = 2026-12-31 23:59:59
 
 **关键**: 必须设置固定的 `jwt_secret`（随机字符串），否则服务器重启后所有用户掉线！
 
-### 3.8 安装 Python 依赖
+### 3.6 安装 Python 依赖
 
 ```powershell
 cd C:\edu-mgmt
@@ -155,7 +143,7 @@ pip install -r requirements_web.txt
 pip install waitress
 ```
 
-### 3.9 启动后端（测试）
+### 3.7 启动后端（测试）
 
 ```powershell
 cd C:\edu-mgmt
@@ -170,7 +158,7 @@ python run_prod.py
 
 在服务器浏览器打开 `http://localhost:5000`，确认 API 正常。
 
-### 3.10 开放腾讯云防火墙
+### 3.8 开放腾讯云防火墙
 
 1. 登录腾讯云控制台 → 轻量应用服务器 → 你的实例
 2. **防火墙** → 添加规则：
@@ -178,7 +166,7 @@ python run_prod.py
    - 端口: `80`，协议: `TCP`，策略: 允许，备注: "Nginx HTTP"
    - 端口: `443`，协议: `TCP`，策略: 允许，备注: "Nginx HTTPS"
 
-### 3.11 安装 Nginx 作为反向代理
+### 3.9 安装 Nginx 作为反向代理
 
 ```powershell
 # 下载 Nginx for Windows
@@ -203,17 +191,14 @@ http {
 
     server {
         listen 80;
-        server_name _;  # 你的服务器IP或域名
+        server_name _;
 
-        # 字符集
         charset utf-8;
         client_max_body_size 50m;
 
-        # 前端静态文件（如果前端也部署在服务器上）
         root C:/edu-mgmt/frontend/dist;
         index index.html;
 
-        # API 反向代理到 Flask
         location /api/ {
             proxy_pass http://127.0.0.1:5000;
             proxy_set_header Host $host;
@@ -222,7 +207,6 @@ http {
             proxy_read_timeout 60s;
         }
 
-        # SPA fallback
         location / {
             try_files $uri $uri/ /index.html;
         }
@@ -230,7 +214,7 @@ http {
 }
 ```
 
-### 3.12 构建前端（指向服务器）
+### 3.10 构建前端（指向服务器）
 
 在**本地**构建前端，然后上传到服务器：
 
@@ -243,7 +227,7 @@ npm run build
 # 将 dist 目录上传到服务器的 C:\edu-mgmt\frontend\dist\
 ```
 
-### 3.13 设置 Nginx + Flask 开机自启
+### 3.11 设置 Nginx + Flask 开机自启
 
 创建 `C:\edu-mgmt\start_services.bat`：
 
@@ -273,8 +257,6 @@ npm run build
 # 将 dist/ 推送到 gh-pages 分支
 ```
 
-GitHub Pages 的域名是 `https://你的用户名.github.io/仓库名/`。
-
 ### 选项 C：本地开发 + 远程后端
 
 ```powershell
@@ -296,11 +278,11 @@ npm run dev
 ## 六、安全加固建议
 
 1. **修改默认密码**：admin / 123456 → 立即修改
-2. **Windows 防火墙**：仅开放 80/443/1433（1433 仅限本地连接）
-3. **SQL Server**：创建专用登录用户替代 sa
+2. **Windows 防火墙**：仅开放 80/443（3306 仅限本地连接）
+3. **MySQL**：创建专用用户替代 root
 4. **config.ini**：jwt_secret 使用 32 位以上随机字符串
 5. **Nginx**：配置 HTTPS（Let's Encrypt + win-acme）
-6. **定期备份**：SSMS → 维护计划 → 数据库备份
+6. **定期备份**：`mysqldump -u root -p course_management_db > backup.sql`
 
 ---
 
@@ -309,8 +291,9 @@ npm run dev
 | 问题 | 解决 |
 |------|------|
 | 5000 端口访问不了 | 检查腾讯云防火墙 + Windows 防火墙 |
-| Flask 启动报数据库连接错误 | 检查 config.ini 密码，确认 SQL Server 服务正在运行 |
+| Flask 启动报数据库连接错误 | 检查 config.ini 密码，确认 MySQL 服务正在运行 |
 | 登录后立即掉线 | config.ini 中 jwt_secret 未设置或为空 |
 | Nginx 404 错误 | 确认 nginx.conf 中 root 路径正确 |
 | 跨域 CORS 错误 | app_factory.py 已配置 `origins: "*"`，无需额外设置 |
-| SQL Server 内存占用过高 | SSMS → 右键实例 → 属性 → 内存 → 设置上限 |
+| MySQL 连接超时 | 检查 MySQL 服务是否启动: `sc query MySQL80` |
+| 网页中文显示 ??? | 参考 MYSQL_SETUP_GUIDE.md：确保管道编码 + `--default-character-set=utf8mb4` |

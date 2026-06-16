@@ -438,7 +438,6 @@ class GradeController:
     def _write_log(self, session, user_id: str, log_type: str,
                    operation: str, result: str, ip_address: str = ""
                    ) -> None:
-        """写入操作日志。"""
         try:
             log_entry = OperationLog(
                 user_id=user_id,
@@ -449,5 +448,11 @@ class GradeController:
                 ip_address=ip_address,
             )
             session.add(log_entry)
-        except Exception as e:
-            logger.warning(f"操作日志写入失败: {e}")
+            session.flush()
+        except Exception:
+            try:
+                session.rollback()
+                session.expunge(log_entry)
+            except Exception:
+                pass
+            logger.warning(f"操作日志写入失败（已跳过）: user={user_id} {operation}")
