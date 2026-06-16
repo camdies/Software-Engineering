@@ -207,7 +207,7 @@ tasklist 2>nul | findstr "EduMgmt" >nul && echo EduMgmt processes : RUNNING || e
 sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul && echo MySQL-EduMgmt     : RUNNING
 sc query MySQL80       2>nul | findstr RUNNING >nul && echo MySQL80            : RUNNING
 sc query MariaDB       2>nul | findstr RUNNING >nul && echo MariaDB            : RUNNING
-"mysql-portable\bin\mysqladmin.exe" -u root -pCairenbin2005 --protocol=TCP ping 2>nul | findstr "alive" >nul && echo MySQL foreground   : RUNNING
+"mysql-portable\bin\mysql.exe" -u root -pCairenbin2005 --protocol=TCP -e "SELECT 1" 2>nul | findstr "1" >nul && echo MySQL foreground   : RUNNING
 echo.
 netsh advfirewall firewall show rule name="EduMgmt Flask 5000" 2>nul | findstr Enabled >nul && echo Firewall          : Port 5000 OPEN || echo Firewall          : Port 5000 NO RULE
 echo LAN IPv4         : %LOCAL_IP%
@@ -265,7 +265,7 @@ echo.
 echo [1/3] Purging machine-specific data...
 if exist "mysql-portable\data\" (
     pushd mysql-portable
-    .\bin\mysqladmin.exe -u root -pCairenbin2005 --protocol=TCP ping 2>nul | findstr "alive" >nul
+    .\bin\mysql.exe -u root -pCairenbin2005 --protocol=TCP -e "SELECT 1" 2>nul | findstr "1" >nul
     if %errorlevel% equ 0 (
         .\bin\mysql.exe -u root -pCairenbin2005 --protocol=TCP -e "RESET MASTER;" 2>nul
         .\bin\mysql.exe -u root -pCairenbin2005 --protocol=TCP -e "FLUSH LOGS;" 2>nul
@@ -307,7 +307,7 @@ goto :menu
 :: Returns errorlevel 0 = running, 1 = not running
 :: =================================================================
 :mysql_is_running
-"mysql-portable\bin\mysqladmin.exe" -u root -pCairenbin2005 --protocol=TCP ping 2>nul | findstr "alive" >nul
+"mysql-portable\bin\mysql.exe" -u root -pCairenbin2005 --protocol=TCP -e "SELECT 1" 2>nul | findstr "1" >nul
 if %errorlevel% equ 0 exit /b 0
 sc query MySQL-EduMgmt 2>nul | findstr RUNNING >nul
 if %errorlevel% equ 0 exit /b 0
@@ -379,7 +379,7 @@ type backend\config\init_database_mysql.sql | .\mysql-portable\bin\mysql.exe -u 
 popd
 chcp 936 >nul
 echo Database imported. Shutting down temporary MySQL...
-.\bin\mysqladmin.exe -u root -pCairenbin2005 --protocol=TCP shutdown 2>nul
+.\bin\mysql.exe -u root -pCairenbin2005 --protocol=TCP -e "SHUTDOWN" 2>nul
 timeout /t 2 /nobreak >nul
 taskkill /FI "WINDOWTITLE eq EMI" /F 2>nul
 echo First-time setup complete.
