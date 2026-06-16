@@ -2,7 +2,7 @@
 
 create_app() 函数创建并配置 Flask 应用：
 - 初始化数据库
-- 注册所有 7 个 Blueprint
+- 注册所有 9 个 Blueprint
 - 配置 CORS
 - 生产模式：服务 Vue dist 静态文件 + SPA fallback
 """

@@ -14,6 +14,3 @@ reportlab>=4.0.0
 pandas>=2.0.0
 python-dotenv>=1.0.0
 coverage>=7.0.0
-# 传统桌面 GUI（Web 版不需要，保留方便过渡）
-PySide6>=6.6.0
-PyQt5>=5.15.0

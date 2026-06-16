@@ -10,6 +10,7 @@ from datetime import datetime
 from backend.models.base import DatabaseManager
 from backend.models.user_account import UserAccount
 from backend.models.operation_log import OperationLog
+from backend.config.settings import Settings
 from backend.utils.auth_util import hash_password, verify_password
 from backend.utils.validator import validate_password
 from backend.utils.log_util import get_logger
@@ -82,10 +83,11 @@ class AuthController:
                 # 验证密码
                 if not verify_password(password, user.password_hash):
                     user.login_fail_count = (user.login_fail_count or 0) + 1
-                    if user.login_fail_count >= 5:
+                    max_attempts = Settings.get_instance().max_login_attempts
+                    if user.login_fail_count >= max_attempts:
                         user.is_locked = 1
                         logger.warning(
-                            f"账号{user_id}密码错误已达5次，已锁定"
+                            f"账号{user_id}密码错误已达{max_attempts}次，已锁定"
                         )
                     self._write_log(session, user_id, "登录",
                                     f"密码错误(第{user.login_fail_count}次)",
@@ -96,7 +98,7 @@ class AuthController:
                         "user_id": user_id,
                         "message": (
                             f"密码错误，剩余尝试次数: "
-                            f"{max(0, 5 - (user.login_fail_count or 0))}"
+                            f"{max(0, max_attempts - (user.login_fail_count or 0))}"
                         ),
                     }
 
