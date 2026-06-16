@@ -40,6 +40,7 @@ def create_app() -> Flask:
         __name__,
         static_folder=None,  # 我们手动处理静态文件
     )
+    app.config['JSON_AS_ASCII'] = False  # 中文不转义为 \uXXXX
 
     # CORS — 允许跨域（开发时 Vite dev server 在不同端口）
     CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -72,14 +73,15 @@ def create_app() -> Flask:
     _setup_static_serving(app)
 
     # ── 初始化数据库（延迟到首次请求）──
+    # 仅初始化连接，不做 create_all_tables —
+    # DDL 脚本已通过 init_database_mysql.sql 导入全部表结构。
     @app.before_request
     def _init_db_on_first_request():
         if getattr(app, '_db_ready', False):
             return
         try:
             from backend.models.base import DatabaseManager
-            db = DatabaseManager.get_instance()
-            db.create_all_tables()
+            DatabaseManager.get_instance()
             app._db_ready = True
         except Exception:
             pass

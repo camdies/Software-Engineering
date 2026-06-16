@@ -103,11 +103,14 @@ class AuthController:
                 # 登录成功
                 user.last_login = datetime.now()
                 user.login_fail_count = 0
-                self._write_log(session, user_id, "登录",
-                                f"用户{user_id}登录成功", "成功", ip_address)
 
                 role = user.role
                 logger.info(f"用户{user_id}({role})登录成功")
+
+                # 先返回成功，日志写入在 return 之前；如果日志失败，
+                # return 仍然会执行（_write_log 内部捕获异常不回滚）。
+                self._write_log(session, user_id, "登录",
+                                f"用户{user_id}登录成功", "成功", ip_address)
 
                 return {
                     "success": True,
@@ -318,16 +321,7 @@ class AuthController:
 
     def _write_log(self, session, user_id: str, log_type: str,
                    operation: str, result: str, ip_address: str) -> None:
-        """写入操作日志。
-
-        Args:
-            session: 数据库会话对象。
-            user_id: 操作用户ID。
-            log_type: 操作类型（登录/选课/成绩/系统）。
-            operation: 操作描述。
-            result: 操作结果（成功/失败）。
-            ip_address: 操作IP地址。
-        """
+        """写入操作日志，失败不影响主流程。"""
         try:
             log_entry = OperationLog(
                 user_id=user_id,
@@ -338,5 +332,14 @@ class AuthController:
                 ip_address=ip_address,
             )
             session.add(log_entry)
-        except Exception as e:
-            logger.warning(f"操作日志写入失败: {e}")
+            # 立即 flush 以便发现问题时 expunge，否则 commit 阶段才报错会
+            # 回滚整个事务（包括登录成功的 user 状态更新）。
+            session.flush()
+        except Exception:
+            session.rollback()
+            # 把污染对象踢出 session，后续 commit 不受影响
+            try:
+                session.expunge(log_entry)
+            except Exception:
+                pass
+            logger.warning(f"操作日志写入失败（已跳过）: user={user_id} {operation}")

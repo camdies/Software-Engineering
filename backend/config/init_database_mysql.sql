@@ -254,6 +254,7 @@ CREATE TABLE operation_log (
 CREATE TABLE password_reset_request (
     request_id   INT            NOT NULL AUTO_INCREMENT,
     user_id      VARCHAR(20)    NOT NULL,
+    new_password VARCHAR(255)   NULL        COMMENT '申请的新密码哈希（NULL=重置为默认密码）',
     reason       VARCHAR(500)   NULL,
     status       VARCHAR(10)    NOT NULL DEFAULT '待审核',
     admin_id     VARCHAR(20)    NULL,

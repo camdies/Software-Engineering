@@ -441,16 +441,6 @@ class EnrollmentController:
     def _write_log(self, session, user_id: str, log_type: str,
                    operation: str, result: str, ip_address: str = ""
                    ) -> None:
-        """写入操作日志。
-
-        Args:
-            session: 数据库会话。
-            user_id: 操作用户ID。
-            log_type: 操作类型。
-            operation: 操作描述。
-            result: 操作结果（成功/失败）。
-            ip_address: 操作IP地址。
-        """
         try:
             log_entry = OperationLog(
                 user_id=user_id,
@@ -461,5 +451,11 @@ class EnrollmentController:
                 ip_address=ip_address,
             )
             session.add(log_entry)
-        except Exception as e:
-            logger.warning(f"操作日志写入失败: {e}")
+            session.flush()
+        except Exception:
+            try:
+                session.rollback()
+                session.expunge(log_entry)
+            except Exception:
+                pass
+            logger.warning(f"操作日志写入失败（已跳过）: user={user_id} {operation}")

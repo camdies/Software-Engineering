@@ -94,6 +94,10 @@ class DatabaseManager:
 
             connect_args = {}
 
+            # MySQL: 强制 utf8mb4 字符集，避免中文乱码
+            if self._driver == "mysql":
+                connect_args = {"charset": "utf8mb4"}
+
             # pyodbc 额外参数
             if self._driver == "mssql" and "pyodbc" in db_url:
                 connect_args = {

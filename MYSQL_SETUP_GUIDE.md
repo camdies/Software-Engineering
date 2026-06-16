@@ -1,136 +1,73 @@
-# MySQL 8.0 下载 → 安装 → 嵌入项目全流程指引
+# 数据库修复与重建指引
 
-> 本指引将 MySQL 数据库嵌入到项目目录中，实现免安装版（Portable）部署，
-> 即项目目录自包含数据库，拷贝到任何电脑上都能直接运行。
+> 当 `operation_log` 等表的 CHECK 约束中文被污染（表现为登录成功但 400 错误、日志报 `CK_log_result is violated`），或网页中文显示为 `???`，按以下步骤重建。
 
----
+## 根因说明
 
-## 方案选择
+PowerShell 管道输出到外部程序时默认使用 ASCII 编码（由 `$OutputEncoding` 控制）。即使 `Get-Content -Encoding UTF8` 正确读取了 UTF-8 文件，管道传给 `mysql.exe` 时字符会被 ASCII 编码截断，中文字节丢失变成 `?`。
 
-| 方案 | 适用场景 | 优点 | 缺点 |
-|------|---------|------|------|
-| **A: 标准安装** | 个人开发机 | 简单快速，开机自启 | 需要管理员权限，绑定系统 |
-| **B: 嵌入式部署** | 团队协作 / 分发 | 项目自包含，拷贝即用 | 需手动启停，稍复杂 |
+**所有** `Get-Content ... | mysql` 命令都必须先设置 `$OutputEncoding` 并加 `--default-character-set=utf8mb4`。
 
-**推荐方案 B**：把 MySQL 装在项目目录下，伙伴拿到项目后无需额外配置数据库。
+## 1. 确保 MySQL 在运行
 
----
+如果安装了 Windows 服务：
+```powershell
+net start MySQL-EduMgmt
+```
+否则前台启动：
+```powershell
+cd "<项目目录>\mysql-portable"
+.\bin\mysqld.exe --defaults-file="$PWD\my.ini" --console
+```
 
-## 方案 A：标准安装 MySQL（最快上手）
-
-### 1. 下载 MySQL 8.0
-
-打开 https://dev.mysql.com/downloads/installer/ ，下载 `mysql-installer-community-8.0.xx.msi`（约 350MB）。
-
-### 2. 安装
-
-1. 运行 `.msi` 安装程序
-2. 选择 **Server only**（只需要数据库服务）
-3. 一路 Next，在 **Accounts and Roles** 页面设置 **root 密码**（记下来！）
-4. 确保 **MySQL80** 服务设为自动启动
-5. 完成安装
-
-### 3. 验证
-
-打开命令提示符：
+## 2. 删掉旧库并重建
 
 ```powershell
-mysql -u root -p
+cd "<项目目录>"
+
+# 删除旧库
+.\mysql-portable\bin\mysql.exe -u root -p你的密码 -e "DROP DATABASE IF EXISTS course_management_db;"
+
+# 设置管道输出编码为 UTF-8，然后导入 DDL（两步缺一不可）
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
+Get-Content backend\config\init_database_mysql.sql -Encoding UTF8 | .\mysql-portable\bin\mysql.exe -u root -p你的密码 --default-character-set=utf8mb4
 ```
 
-输入密码后进入 MySQL 命令行即表示成功。
+> `$OutputEncoding` 确保管道以 UTF-8 传给 mysql.exe；`--default-character-set=utf8mb4` 确保 mysql 客户端以 utf8mb4 解析输入。
 
-### 4. 初始化项目数据库
+## 3. 验证
 
 ```powershell
-cd "D:\C++\VisualStudio study\Software Engineering"
-mysql -u root -p < backend\config\init_database_mysql.sql
+.\mysql-portable\bin\mysql.exe -u root -p你的密码 -e "USE course_management_db; SHOW TABLES; SELECT student_id, name FROM student LIMIT 3;"
 ```
 
-输入 root 密码，脚本会自动创建 `course_management_db` 数据库和全部 11 张表，并插入测试数据。
+输出 11 张表 + 学生姓名正常显示中文（王小明、赵小红、刘小刚）即成功。
 
-### 5. 配置项目连接
-
-编辑 `backend\config\config.ini`，确保 `[database]` 段如下：
-
-```ini
-[database]
-driver = mysql
-host = localhost
-port = 3306
-user = root
-password = 你设置的root密码
-database = course_management_db
-pool_size = 10
-```
-
----
-
-## 方案 B：MySQL 嵌入项目目录（推荐，免安装分发）
-
-### 1. 下载 MySQL 8.0 ZIP Archive（免安装版）
-
-官方下载页：https://dev.mysql.com/downloads/mysql/
-
-选择 **Windows (x86, 64-bit), ZIP Archive**（约 200MB），下载到项目根目录。
-
-或者直接命令行（PowerShell）：
+## 4. 后续：每次导入 SQL 务必设置管道编码
 
 ```powershell
-cd "D:\C++\VisualStudio study\Software Engineering"
+# 正确（三步缺一不可）
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
+Get-Content xxx.sql -Encoding UTF8 | .\mysql-portable\bin\mysql.exe -u root -p密码 --default-character-set=utf8mb4
 
-# 下载 MySQL 8.0.36 ZIP 免安装版
-Invoke-WebRequest -Uri "https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.36-winx64.zip" -OutFile "mysql.zip"
-
-# 解压
-Expand-Archive mysql.zip -DestinationPath .
-Rename-Item mysql-8.0.36-winx64 mysql-portable
-Remove-Item mysql.zip
+# 错误（会毁掉中文）
+Get-Content xxx.sql | .\mysql-portable\bin\mysql.exe -u root -p密码
+Get-Content xxx.sql -Encoding UTF8 | .\mysql-portable\bin\mysql.exe -u root -p密码
 ```
 
-最终目录结构：
-```
-Software Engineering/
-├── mysql-portable/          ← MySQL 免安装版
-│   ├── bin/
-│   │   ├── mysqld.exe
-│   │   └── mysql.exe
-│   ├── data/                ← 数据库数据文件（初始化后生成）
-│   └── my.ini               ← 配置文件
-├── backend/
-├── frontend/
-├── run.py
-└── ...
-```
+## 5. 首次安装参考
 
-### 2. 创建 MySQL 配置文件
-
-在 `mysql-portable/` 目录下创建 `my.ini`：
+MySQL 8.0 ZIP 免安装版（[下载](https://dev.mysql.com/downloads/mysql/)），解压到项目根目录命名为 `mysql-portable`。在 `mysql-portable\` 下创建 `my.ini`：
 
 ```ini
 [mysqld]
-# 基于项目目录的相对路径
-basedir=D:/C++/VisualStudio study/Software Engineering/mysql-portable
-datadir=D:/C++/VisualStudio study/Software Engineering/mysql-portable/data
-
-# 端口（与 config.ini 一致）
+basedir=<项目目录>/mysql-portable
+datadir=<项目目录>/mysql-portable/data
 port=3306
-
-# 字符集
 character-set-server=utf8mb4
 collation-server=utf8mb4_unicode_ci
-
-# 默认存储引擎
 default-storage-engine=INNODB
-
-# 连接数
 max_connections=50
-
-# 允许从 localhost 之外的地址连接（如果需要局域网访问）
-# bind-address=0.0.0.0
-
-# 认证插件（兼容旧客户端）
-default_authentication_plugin=mysql_native_password
 
 [client]
 port=3306
@@ -140,199 +77,27 @@ default-character-set=utf8mb4
 default-character-set=utf8mb4
 ```
 
-> **重要**：`basedir` 和 `datadir` 请根据你的实际项目路径修改！
-
-### 3. 初始化 MySQL 数据目录
-
-以**管理员身份**打开 PowerShell：
-
+初始化数据目录（PowerShell，管理员）：
 ```powershell
-cd "D:\C++\VisualStudio study\Software Engineering\mysql-portable"
-
-# 初始化数据目录（生成 root 空密码）
+cd "<项目目录>\mysql-portable"
 .\bin\mysqld.exe --defaults-file="$PWD\my.ini" --initialize-insecure --console
 ```
 
-> `--initialize-insecure` 表示 root 无初始密码。查看控制台输出确认初始化成功。
-
-### 4. 启动 MySQL
-
+安装为 Windows 服务（一劳永逸，管理员）：
 ```powershell
-cd "D:\C++\VisualStudio study\Software Engineering\mysql-portable"
-
-# 前台启动（调试用，Ctrl+C 停止）
-.\bin\mysqld.exe --defaults-file="$PWD\my.ini" --console
-
-# 后台启动（安装为 Windows 服务）
+cd "<项目目录>\mysql-portable"
 .\bin\mysqld.exe --install MySQL-EduMgmt --defaults-file="$PWD\my.ini"
 net start MySQL-EduMgmt
-```
-
-### 5. 设置 root 密码
-
-首次启动后，打开**另一个**命令提示符：
-
-```powershell
-cd "D:\C++\VisualStudio study\Software Engineering\mysql-portable\bin"
-
-# 无密码登录（--initialize-insecure 模式）
-.\mysql.exe -u root
-
-# 在 MySQL 命令行中设置密码
-ALTER USER 'root'@'localhost' IDENTIFIED BY 'Cairenbin2005';
-FLUSH PRIVILEGES;
-EXIT;
-```
-
-### 6. 初始化项目数据库
-
-```powershell
-cd "D:\C++\VisualStudio study\Software Engineering"
-
-# PowerShell 方法（推荐）
-Get-Content backend\config\init_database_mysql.sql -Encoding UTF8 | .\mysql-portable\bin\mysql.exe -u root -pCairenbin2005
-
-# 或者用 CMD 重定向
-cmd /c ".\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 < backend\config\init_database_mysql.sql"
-```
-
-验证：
-```powershell
-.\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 -e "USE course_management_db; SHOW TABLES;"
-```
-
-应输出 11 张表。
-
-### 7. 配置项目连接
-
-编辑 `backend\config\config.ini`：
-
-```ini
-[database]
-driver = mysql
-host = localhost
-port = 3306
-user = root
-password = Cairenbin2005
-database = course_management_db
-pool_size = 10
-```
-
-### 8. 启动项目
-
-```powershell
-# 确保 MySQL 已启动
-net start MySQL-EduMgmt
-
-# 启动 Flask
-python run.py
-```
-
----
-
-## 可选：配置为 Windows 服务（开机自启）
-
-把嵌入式 MySQL 注册为 Windows 服务：
-
-```powershell
-cd "D:\C++\VisualStudio study\Software Engineering\mysql-portable"
-
-# 安装服务
-.\bin\mysqld.exe --install MySQL-EduMgmt --defaults-file="$PWD\my.ini"
-
-# 启动服务
-net start MySQL-EduMgmt
-
-# 设为自动启动
 sc config MySQL-EduMgmt start=auto
 ```
 
-如果不想要服务了，卸载：
+首次登录设密码：
 ```powershell
-net stop MySQL-EduMgmt
-.\bin\mysqld.exe --remove MySQL-EduMgmt
+.\bin\mysql.exe -u root
+# 在 mysql> 中执行：
+# ALTER USER 'root'@'localhost' IDENTIFIED BY '你的密码';
+# FLUSH PRIVILEGES;
+# EXIT;
 ```
 
----
-
-## 日常操作
-
-### 启停 MySQL
-
-```powershell
-# 启动
-net start MySQL-EduMgmt
-
-# 停止
-net stop MySQL-EduMgmt
-```
-
-如果不安装服务，前台启动：
-```powershell
-cd "D:\C++\VisualStudio study\Software Engineering\mysql-portable"
-.\bin\mysqld.exe --defaults-file="%CD%\my.ini" --console
-```
-
-### 数据备份
-
-```powershell
-# PowerShell 导出
-.\mysql-portable\bin\mysqldump.exe -u root -pCairenbin2005 course_management_db | Out-File -Encoding UTF8 backup.sql
-
-# 导入恢复
-Get-Content backup.sql -Encoding UTF8 | .\mysql-portable\bin\mysql.exe -u root -pCairenbin2005
-```
-
-### 完全重置数据库
-
-```powershell
-.\mysql-portable\bin\mysql.exe -u root -pCairenbin2005 -e "DROP DATABASE IF EXISTS course_management_db; CREATE DATABASE course_management_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-Get-Content backend\config\init_database_mysql.sql -Encoding UTF8 | .\mysql-portable\bin\mysql.exe -u root -pCairenbin2005
-```
-
----
-
-## 伙伴分发清单
-
-当你把整个项目目录拷贝给伙伴时，伙伴只需要：
-
-1. **安装 Python 3.11+** 和 **Node.js 18+**（如果要用前端热重载）
-2. **修改 `mysql-portable\my.ini`** 中的 `basedir` 和 `datadir` 为自己的路径
-3. **安装 MySQL 服务**（见上方 "配置为 Windows 服务"）
-4. **启动 MySQL + Flask** 即可
-
-```powershell
-# 伙伴拿到项目后执行
-cd "D:\...\Software Engineering\mysql-portable"
-.\bin\mysqld.exe --install MySQL-EduMgmt --defaults-file="$PWD\my.ini"
-net start MySQL-EduMgmt
-
-cd ..
-pip install -r requirements.txt
-pip install Flask flask-cors PyJWT marshmallow
-python run.py
-```
-
----
-
-## 常见问题
-
-| 问题 | 解决 |
-|------|------|
-| `mysqld.exe` 启动闪退 | 检查 `my.ini` 路径是否正确，`basedir` 和 `datadir` 必须用正斜杠 `/` |
-| `Access denied for user 'root'` | 用 `--initialize-insecure` 重新初始化，或重置密码 |
-| 端口 3306 被占用 | 修改 `my.ini` 和 `config.ini` 中的端口号 |
-| `Can't connect to MySQL server` | 确认 MySQL 服务已启动：`net start MySQL-EduMgmt` |
-| 中文乱码 | 确认 `my.ini` 中 `character-set-server=utf8mb4` |
-| 伙伴机无法连接 MySQL | 修改 `my.ini` 添加 `bind-address=0.0.0.0`，并开放防火墙 3306 端口 |
-
----
-
-## 驱动备选（如果需要用 SQL Server）
-
-项目仍保留 SQL Server 支持，如需切换：
-
-1. 安装 ODBC Driver 18 for SQL Server
-2. 修改 `config.ini` 中 `driver = mssql`
-3. 执行 `backend\config\init_database.sql`（SQL Server 版 DDL）
-4. 安装 pyodbc：`pip install pyodbc`
+然后按上方第 2 步导入 DDL 即可。
