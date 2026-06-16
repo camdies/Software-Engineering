@@ -175,7 +175,7 @@ ZeroTier 免费支持 25 个设备，无需公网 IP。
 
 ### 方式 C：完全独立部署
 
-按照 `SQL_SERVER_SETUP_GUIDE.md` 在伙伴电脑上安装 SQL Server 并初始化数据库，完全独立运行。
+按照 `MYSQL_SETUP_GUIDE.md` 在伙伴电脑上安装 MySQL 并初始化数据库，完全独立运行。
 
 ---
 

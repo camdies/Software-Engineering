@@ -3,7 +3,7 @@
 > 总文件数: **124** (不含 .venv, node_modules, __pycache__, .git)  
 > 后端: Python Flask + SQLAlchemy (38 .py)  
 > 前端: Vue 3 + Element Plus + Vite (17 .vue + 5 .js)  
-> 数据库: SQL Server / MySQL (1 .sql)
+> 数据库: MySQL 8.0+ (默认) / SQL Server (可选) (2 .sql)
 
 ---
 

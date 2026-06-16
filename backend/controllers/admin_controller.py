@@ -146,8 +146,8 @@ class AdminController:
                     return {"success": False, "message": "学生不存在"}
 
                 # Delete UserAccount FIRST (parent), then Student (child).
-                # Student FK -> user_account is ON DELETE CASCADE, but
-                # explicit order prevents double-delete contention on MSSQL.
+                # Student FK -> user_account is ON DELETE CASCADE.
+                # Explicit order prevents double-delete contention.
                 account = session.query(UserAccount).filter_by(
                     user_id=student_id).first()
                 if account:
