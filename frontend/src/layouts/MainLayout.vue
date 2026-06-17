@@ -28,6 +28,7 @@
             <el-menu-item index="/admin/course-plans"><el-icon><Notebook /></el-icon><span>开课计划</span></el-menu-item>
           </el-sub-menu>
           <el-menu-item index="/admin/audit"><el-icon><Checked /></el-icon><span>审核中心</span></el-menu-item>
+          <el-menu-item index="/admin/enrollment-control"><el-icon><Timer /></el-icon><span>选课控制</span></el-menu-item>
           <el-menu-item index="/admin/enrollment-stats"><el-icon><DataAnalysis /></el-icon><span>选课统计</span></el-menu-item>
           <el-menu-item index="/admin/logs"><el-icon><Tickets /></el-icon><span>操作日志</span></el-menu-item>
         </template>
@@ -94,7 +95,7 @@ import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 import {
   UserFilled, User, Avatar, Reading, Collection, Notebook, Select, Setting,
   DataAnalysis, Document, Checked, Monitor, Tickets, Edit, Warning,
-  CirclePlus, List, Expand, Fold,
+  CirclePlus, List, Expand, Fold, Timer,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()

@@ -301,7 +301,7 @@ class StatsController:
             dict: 包含schedule二维数组的字典。
         """
         try:
-            from backend.models.student_controller import StudentController
+            from backend.controllers.student_controller import StudentController
             sc = StudentController()
             my_courses = sc.get_my_courses(student_id)
 

@@ -25,6 +25,7 @@ const routes = [
       { path: 'admin/courses', name: 'AdminCourses', component: () => import('@/views/admin/AdminCourses.vue'), meta: { role: 'admin', title: '课程管理' } },
       { path: 'admin/course-plans', name: 'AdminCoursePlans', component: () => import('@/views/admin/AdminCoursePlans.vue'), meta: { role: 'admin', title: '开课计划' } },
       { path: 'admin/audit', name: 'AdminAudit', component: () => import('@/views/admin/AdminAudit.vue'), meta: { role: 'admin', title: '审核中心' } },
+      { path: 'admin/enrollment-control', name: 'AdminEnrollmentControl', component: () => import('@/views/admin/AdminEnrollmentControl.vue'), meta: { role: 'admin', title: '选课控制' } },
       { path: 'admin/enrollment-stats', name: 'AdminEnrollmentStats', component: () => import('@/views/admin/AdminEnrollmentStats.vue'), meta: { role: 'admin', title: '选课统计' } },
       { path: 'admin/logs', name: 'AdminLogs', component: () => import('@/views/admin/AdminLogs.vue'), meta: { role: 'admin', title: '操作日志' } },
 

@@ -240,7 +240,63 @@ def get_course_plans():
     return success_response({"items": data})
 
 
-# ── Enrollment Control ──
+# ── Semester Config CRUD ──
+
+@admin_bp.route("/semester-configs", methods=["GET"])
+@require_auth
+@require_role("admin")
+def get_semester_configs():
+    result = AdminController().get_semester_configs()
+    return success_response(result)
+
+
+@admin_bp.route("/semester-configs", methods=["POST"])
+@require_auth
+@require_role("admin")
+def create_semester_config():
+    data = request.get_json(silent=True) or {}
+    semester = (data.get("semester") or "").strip()
+    if not semester:
+        return error_response("学期标识不能为空")
+    result = AdminController().create_semester_config(
+        semester=semester,
+        total_weeks=data.get("total_weeks", 20),
+        start_date=data.get("start_date"),
+        end_date=data.get("end_date"),
+        is_current=data.get("is_current", False),
+        enrollment_open=data.get("enrollment_open", False),
+        enroll_start=data.get("enroll_start"),
+        enroll_end=data.get("enroll_end"),
+    )
+    if result.get("success"):
+        return success_response(message=result["message"],
+                                data=result.get("data"))
+    return error_response(result.get("message", "创建失败"))
+
+
+@admin_bp.route("/semester-configs/<int:config_id>", methods=["PUT"])
+@require_auth
+@require_role("admin")
+def update_semester_config(config_id):
+    data = request.get_json(silent=True) or {}
+    result = AdminController().update_semester_config(config_id, **data)
+    if result.get("success"):
+        return success_response(message=result["message"],
+                                data=result.get("data"))
+    return error_response(result.get("message", "更新失败"))
+
+
+@admin_bp.route("/semester-configs/<int:config_id>", methods=["DELETE"])
+@require_auth
+@require_role("admin")
+def delete_semester_config(config_id):
+    result = AdminController().delete_semester_config(config_id)
+    if result.get("success"):
+        return success_response(message=result["message"])
+    return error_response(result.get("message", "删除失败"))
+
+
+# ── Enrollment Control (Legacy — now backed by semester_config) ──
 
 @admin_bp.route("/enrollment-control", methods=["GET"])
 @require_auth

@@ -418,6 +418,137 @@ class AdminController:
             logger.error(f"删除课程异常: {e}", exc_info=True)
             return {"success": False, "message": "操作失败，请重试"}
 
+    # ----- Semester Config management -----
+
+    def get_semester_configs(self) -> dict:
+        """获取所有学期配置记录。
+
+        Returns:
+            dict: {'data': list}
+        """
+        try:
+            from backend.models.semester_config import SemesterConfig
+            with self._db.get_session() as session:
+                configs = session.query(SemesterConfig).order_by(
+                    SemesterConfig.semester.desc()
+                ).all()
+                return {
+                    "data": [c.to_dict() for c in configs],
+                }
+        except Exception as e:
+            logger.error(f"查询学期配置异常: {e}", exc_info=True)
+            return {"data": []}
+
+    def create_semester_config(self, semester: str, total_weeks: int = 20,
+                               start_date: str = None, end_date: str = None,
+                               is_current: bool = False,
+                               enrollment_open: bool = False,
+                               enroll_start: str = None,
+                               enroll_end: str = None) -> dict:
+        """创建学期配置记录。
+
+        Args:
+            semester: 学期标识，如 2026-2027-1
+            total_weeks: 学期总周数
+            start_date: 学期开始日期，格式 YYYY-MM-DD
+            end_date: 学期结束日期，格式 YYYY-MM-DD
+            is_current: 是否为当前学期
+            enrollment_open: 选课是否开放
+            enroll_start: 选课开始时间，格式 YYYY-MM-DD HH:MM:SS
+            enroll_end: 选课结束时间，格式 YYYY-MM-DD HH:MM:SS
+        """
+        try:
+            from backend.models.semester_config import SemesterConfig
+            from datetime import datetime, date as dt_date
+            with self._db.get_session() as session:
+                config = SemesterConfig(
+                    semester=semester,
+                    total_weeks=total_weeks,
+                    start_date=dt_date.fromisoformat(start_date) if start_date else None,
+                    end_date=dt_date.fromisoformat(end_date) if end_date else None,
+                    is_current=1 if is_current else 0,
+                    enrollment_open=1 if enrollment_open else 0,
+                    enroll_start=datetime.strptime(enroll_start, "%Y-%m-%d %H:%M:%S")
+                    if enroll_start else None,
+                    enroll_end=datetime.strptime(enroll_end, "%Y-%m-%d %H:%M:%S")
+                    if enroll_end else None,
+                )
+                if is_current:
+                    session.query(SemesterConfig).update({"is_current": 0})
+                session.add(config)
+                self._write_log(session, "admin", "系统",
+                                f"创建学期配置: {semester}", "成功", "")
+                return {"success": True, "message": "学期配置创建成功",
+                        "data": config.to_dict()}
+        except Exception as e:
+            logger.error(f"创建学期配置异常: {e}", exc_info=True)
+            return {"success": False, "message": str(e)}
+
+    def update_semester_config(self, config_id: int, **kwargs) -> dict:
+        """更新学期配置记录。
+        支持字段：semester, total_weeks, start_date, end_date,
+        is_current, enrollment_open, enroll_start, enroll_end
+        """
+        try:
+            from backend.models.semester_config import SemesterConfig
+            from datetime import datetime, date as dt_date
+            with self._db.get_session() as session:
+                config = session.query(SemesterConfig).filter_by(
+                    config_id=config_id
+                ).first()
+                if config is None:
+                    return {"success": False, "message": "记录不存在"}
+
+                if "semester" in kwargs:
+                    config.semester = kwargs["semester"]
+                if "total_weeks" in kwargs:
+                    config.total_weeks = kwargs["total_weeks"]
+                if "start_date" in kwargs and kwargs["start_date"]:
+                    config.start_date = dt_date.fromisoformat(kwargs["start_date"])
+                if "end_date" in kwargs and kwargs["end_date"]:
+                    config.end_date = dt_date.fromisoformat(kwargs["end_date"])
+                if "is_current" in kwargs:
+                    config.is_current = 1 if kwargs["is_current"] else 0
+                    # 如果设为当前学期，清除其他记录的 is_current
+                    if kwargs["is_current"]:
+                        session.query(SemesterConfig).filter(
+                            SemesterConfig.config_id != config_id
+                        ).update({"is_current": 0})
+                if "enrollment_open" in kwargs:
+                    config.enrollment_open = 1 if kwargs["enrollment_open"] else 0
+                if "enroll_start" in kwargs and kwargs["enroll_start"]:
+                    config.enroll_start = datetime.strptime(
+                        kwargs["enroll_start"], "%Y-%m-%d %H:%M:%S")
+                if "enroll_end" in kwargs and kwargs["enroll_end"]:
+                    config.enroll_end = datetime.strptime(
+                        kwargs["enroll_end"], "%Y-%m-%d %H:%M:%S")
+
+                self._write_log(session, "admin", "系统",
+                                f"更新学期配置: {config.semester}", "成功", "")
+                return {"success": True, "message": "学期配置更新成功",
+                        "data": config.to_dict()}
+        except Exception as e:
+            logger.error(f"更新学期配置异常: {e}", exc_info=True)
+            return {"success": False, "message": str(e)}
+
+    def delete_semester_config(self, config_id: int) -> dict:
+        """删除学期配置记录。"""
+        try:
+            from backend.models.semester_config import SemesterConfig
+            with self._db.get_session() as session:
+                config = session.query(SemesterConfig).filter_by(
+                    config_id=config_id
+                ).first()
+                if config is None:
+                    return {"success": False, "message": "记录不存在"}
+                session.delete(config)
+                self._write_log(session, "admin", "系统",
+                                f"删除学期配置: {config.semester}", "成功", "")
+                return {"success": True, "message": "学期配置删除成功"}
+        except Exception as e:
+            logger.error(f"删除学期配置异常: {e}", exc_info=True)
+            return {"success": False, "message": str(e)}
+
     # ----- Operation logs -----
 
     def get_logs(self, page: int = 1, page_size: int = 50,

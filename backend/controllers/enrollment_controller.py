@@ -215,27 +215,37 @@ class EnrollmentController:
     def _check_enrollment_period(self) -> dict:
         """校验当前时间是否在选课开放时段内。
 
+        优先检查数据库 semester_config 表；
+        回退到 config.ini。
+
         Returns:
             dict: {'valid': bool, 'message': str}
         """
         try:
-            from backend.config.settings import Settings
             from backend.models.base import DatabaseManager
             from backend.models.semester_config import SemesterConfig
 
-            settings = Settings.get_instance()
-
             # 优先检查数据库中的 semester_config 表
-            try:
-                db = DatabaseManager.get_instance()
-                with db.get_session() as s:
-                    sc = s.query(SemesterConfig).filter_by(is_current=1).first()
-                    if sc and sc.enrollment_open:
-                        return {"valid": True, "message": ""}
-            except Exception:
-                pass
+            db = DatabaseManager.get_instance()
+            with db.get_session() as s:
+                sc = s.query(SemesterConfig).filter_by(is_current=1).first()
+                if sc:
+                    if not sc.enrollment_open:
+                        return {"valid": False,
+                                "message": "当前学期选课未开放"}
+                    if sc.enroll_start and sc.enroll_end:
+                        now = datetime.now()
+                        if now < sc.enroll_start:
+                            return {"valid": False,
+                                    "message": f"选课尚未开始，开始时间: {sc.enroll_start.strftime('%Y-%m-%d %H:%M')}"}
+                        if now > sc.enroll_end:
+                            return {"valid": False,
+                                    "message": "选课已结束"}
+                    return {"valid": True, "message": ""}
 
-            # 回退到 config.ini
+            # 回退到 config.ini（兼容旧版）
+            from backend.config.settings import Settings
+            settings = Settings.get_instance()
             if not settings.enrollment_is_open:
                 return {"valid": False,
                         "message": "当前不在选课时段，无法提交选课"}
@@ -255,7 +265,6 @@ class EnrollmentController:
             return {"valid": True, "message": ""}
         except Exception as e:
             logger.error(f"选课时段校验异常: {e}")
-            # 如果数据库检查失败，默认允许（避免阻止所有选课）
             return {"valid": True, "message": ""}
 
     def _check_time_conflict(self, session, student_id: str,
