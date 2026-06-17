@@ -131,7 +131,6 @@ pip show Flask >nul 2>&1 && pip show SQLAlchemy >nul 2>&1 && pip show PyMySQL >n
 if %errorlevel% neq 0 (
     echo  Installing Python dependencies...
     pip install -r requirements.txt
-    pip install Flask flask-cors PyJWT
 )
 
 :: Start Flask
