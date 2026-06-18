@@ -1,6 +1,6 @@
 # EduMgmt System v3.0 — Complete API Documentation
 
-> **Base URL**: `http://<host>:5000/api`  
+> 总端点: 48
 > **Auth**: JWT Bearer token (HS256, 24h expiry)  
 > **Content-Type**: `application/json` (except file uploads)  
 > **Charset**: UTF-8  
@@ -315,15 +315,36 @@ Query: `page`, `page_size`, `course_id`, `course_name`
 List all course plans. Query: `semester` (optional).
 
 #### GET `/api/admin/enrollment-control`
-Get enrollment period settings.
+Get enrollment period settings. (Legacy — backed by semester_config.)
 
-**Response**: `{ "is_open": false, "open_time": "2026-09-01 08:00:00", "close_time": "2026-09-07 23:59:59" }`
+#### GET `/api/admin/semester-configs`
+List all semester configs. **Auth**: JWT (admin).
 
-#### POST `/api/admin/enrollment-control`
-Set enrollment period.
+**Response**: Array of `{ config_id, semester, total_weeks, start_date, end_date, is_current, enrollment_open, enroll_start, enroll_end }`.
+
+#### POST `/api/admin/semester-configs`
+Create a new semester config. **Auth**: JWT (admin).
 ```json
-{ "is_open": true, "open_time": "2026-09-01 08:00:00", "close_time": "2026-09-15 23:59:59" }
+{
+  "semester": "2027-2028-1",
+  "total_weeks": 20,
+  "start_date": "2027-09-01",
+  "end_date": "2028-01-16",
+  "is_current": false,
+  "enrollment_open": false,
+  "enroll_start": null,
+  "enroll_end": null
+}
 ```
+When `is_current=true`, all other semester configs are automatically unset.
+
+#### PUT `/api/admin/semester-configs/<config_id>`
+Update a semester config. **Auth**: JWT (admin). Body: any subset of the creation fields.
+
+#### DELETE `/api/admin/semester-configs/<config_id>`
+Delete a semester config. **Auth**: JWT (admin).
+
+---
 
 #### GET `/api/admin/enrollment-stats`
 Enrollment statistics per course plan. Query: `semester` (optional).
@@ -650,15 +671,19 @@ Approve/reject a course plan.
 
 ## 4. Default Accounts
 
-| Role | Username | Password |
-|------|----------|----------|
-| Admin | `admin` | `123456` |
-| Teacher | `T001`, `T002`, `T003` | `123456` |
-| Student | `STU001` … `STU005` | `123456` |
+All passwords are **123456**.
+
+| Role | Username |
+|------|----------|
+| Admin | `admin`, `admin2` |
+| Teacher (计科院) | `T001`, `T003`, `T004` |
+| Teacher (数统院) | `T002`, `T005` |
+| Teacher (其他学院) | `T006`, `T007`, `T008` |
+| Student | `STU001` … `STU025` (4个专业, 3个年级) |
 
 ---
 
-## 5. Quick Reference (All 46 Endpoints)
+## 5. Quick Reference (All 48 Endpoints)
 
 | # | Method | URL | Auth |
 |---|--------|-----|------|
@@ -679,32 +704,34 @@ Approve/reject a course plan.
 | 15 | PUT | `/api/admin/courses/<id>` | JWT admin |
 | 16 | DELETE | `/api/admin/courses/<id>` | JWT admin |
 | 17 | GET | `/api/admin/course-plans` | JWT admin |
-| 18 | GET | `/api/admin/enrollment-control` | JWT admin |
-| 19 | POST | `/api/admin/enrollment-control` | JWT admin |
-| 20 | GET | `/api/admin/enrollment-stats` | JWT admin |
-| 21 | GET | `/api/admin/grades/pending` | JWT admin |
-| 22 | GET | `/api/admin/logs` | JWT admin |
-| 23 | GET | `/api/student/courses` | JWT student |
-| 24 | GET | `/api/student/my-courses` | JWT student |
-| 25 | GET | `/api/student/grades` | JWT student |
-| 26 | GET | `/api/student/stats` | JWT student |
-| 27 | GET | `/api/teacher/plans` | JWT teacher |
-| 28 | GET | `/api/teacher/plans/<id>/students` | JWT teacher |
-| 29 | GET | `/api/teacher/grades` | JWT teacher |
-| 30 | POST | `/api/teacher/course-plan` | JWT teacher |
-| 31 | PUT | `/api/teacher/course-plan/<id>` | JWT teacher |
-| 32 | POST | `/api/enrollment/select` | JWT student |
-| 33 | POST | `/api/enrollment/drop` | JWT student |
-| 34 | POST | `/api/grade/record` | JWT teacher |
-| 35 | POST | `/api/grade/batch` | JWT teacher |
-| 36 | POST | `/api/grade/modify` | JWT teacher |
-| 37 | POST | `/api/grade/audit/<id>` | JWT admin |
-| 38 | GET | `/api/stats/class/<id>` | JWT teacher/admin |
-| 39 | GET | `/api/stats/distribution/<id>` | JWT teacher/admin |
-| 40 | POST | `/api/stats/export` | JWT any |
-| 41 | GET | `/api/audit/overview` | JWT admin |
-| 42 | GET | `/api/audit/password-resets` | JWT admin |
-| 43 | POST | `/api/audit/password-resets/<id>` | JWT admin |
-| 44 | GET | `/api/audit/course-plans` | JWT admin |
-| 45 | POST | `/api/audit/course-plans/<id>` | JWT admin |
-| 46 | POST | `/api/auth/forgot-password` | None |
+| 18 | GET | `/api/admin/semester-configs` | JWT admin |
+| 19 | POST | `/api/admin/semester-configs` | JWT admin |
+| 20 | PUT | `/api/admin/semester-configs/<id>` | JWT admin |
+| 21 | DELETE | `/api/admin/semester-configs/<id>` | JWT admin |
+| 22 | GET | `/api/admin/enrollment-stats` | JWT admin |
+| 23 | GET | `/api/admin/grades/pending` | JWT admin |
+| 24 | GET | `/api/admin/logs` | JWT admin |
+| 25 | GET | `/api/student/courses` | JWT student |
+| 26 | GET | `/api/student/my-courses` | JWT student |
+| 27 | GET | `/api/student/grades` | JWT student |
+| 28 | GET | `/api/student/stats` | JWT student |
+| 29 | GET | `/api/teacher/plans` | JWT teacher |
+| 30 | GET | `/api/teacher/plans/<id>/students` | JWT teacher |
+| 31 | GET | `/api/teacher/grades` | JWT teacher |
+| 32 | POST | `/api/teacher/course-plan` | JWT teacher |
+| 33 | PUT | `/api/teacher/course-plan/<id>` | JWT teacher |
+| 34 | POST | `/api/enrollment/select` | JWT student |
+| 35 | POST | `/api/enrollment/drop` | JWT student |
+| 36 | POST | `/api/grade/record` | JWT teacher |
+| 37 | POST | `/api/grade/batch` | JWT teacher |
+| 38 | POST | `/api/grade/modify` | JWT teacher |
+| 39 | POST | `/api/grade/audit/<id>` | JWT admin |
+| 40 | GET | `/api/stats/class/<id>` | JWT teacher/admin |
+| 41 | GET | `/api/stats/distribution/<id>` | JWT teacher/admin |
+| 42 | POST | `/api/stats/export` | JWT any |
+| 43 | GET | `/api/audit/overview` | JWT admin |
+| 44 | GET | `/api/audit/password-resets` | JWT admin |
+| 45 | POST | `/api/audit/password-resets/<id>` | JWT admin |
+| 46 | GET | `/api/audit/course-plans` | JWT admin |
+| 47 | POST | `/api/audit/course-plans/<id>` | JWT admin |
+| 48 | POST | `/api/auth/forgot-password` | None |

@@ -3,7 +3,8 @@
 > 总文件数: **124** (不含 .venv, node_modules, __pycache__, .git)  
 > 后端: Python Flask + SQLAlchemy (38 .py)  
 > 前端: Vue 3 + Element Plus + Vite (17 .vue + 5 .js)  
-> 数据库: MySQL 8.0+ (默认) / SQL Server (可选) (2 .sql)
+> 数据库: MySQL 8.0+ (默认) / SQL Server (可选) (2 .sql)  
+> API 端点: 48
 
 ---
 
@@ -13,7 +14,7 @@
 项目根目录/
 ├── backend/              ← Python Flask REST API
 │   ├── api/              # Flask 应用工厂、认证、响应格式、蓝图路由
-│   │   └── blueprints/   # 9 个蓝图 (46 个 API 端点)
+│   │   └── blueprints/   # 9 个蓝图 (48 个 API 端点)
 │   ├── controllers/      # 7 个业务逻辑控制器
 │   ├── models/           # 11 个 SQLAlchemy ORM 模型
 │   ├── config/           # 配置文件 + DDL 初始化脚本
@@ -23,7 +24,7 @@
 │   │   ├── views/        # 14 个页面组件
 │   │   │   ├── admin/    # 管理员端 (7个)
 │   │   │   ├── teacher/  # 教师端 (4个)
-│   │   │   └── student/  # 学生端 (3个)
+│   │   │   └── student/  # 学生端 (4个)
 │   │   ├── router/       # Vue Router 配置
 │   │   ├── stores/       # Pinia 状态管理
 │   │   ├── layouts/      # 布局组件
@@ -34,7 +35,7 @@
 ├── tests/                # 测试用例
 ├── logs/                 # 日志文件
 ├── *.bat                 # Windows 批处理工具 (start_all/server_control/partner_connect)
-├── *.md                  # 文档 (7个)
+├── *.md                  # 文档 (8个)
 ├── mysql-portable/       # MySQL 8.0 便携版 (含 start_mysql.bat)
 └── run.py                # 入口文件
 ```
@@ -51,11 +52,11 @@
 | `auth.py` | 4.4 KB | JWT 创建/解码、`@require_auth` / `@require_role` 装饰器 |
 | `response.py` | 2.3 KB | `success_response()` / `error_response()` / `wrap_controller_result()` |
 
-### 2.2 蓝图路由 (`backend/api/blueprints/`) — 46 个端点
+### 2.2 蓝图路由 (`backend/api/blueprints/`) — 48 个端点
 
 | 文件 | 大小 | URL 前缀 | 端点数 | 角色 |
 |------|------|----------|--------|------|
-| `admin_bp.py` | 12.9 KB | `/api/admin` | 17 | 管理员 |
+| `admin_bp.py` | 12.9 KB | `/api/admin` | 21 | 管理员 |
 | `audit_bp.py` | 6.5 KB | `/api/audit` | 5 | 管理员 |
 | `auth_bp.py` | 2.7 KB | `/api/auth` | 4 | 公开/任意 |
 | `password_reset_bp.py` | 1.0 KB | `/api/auth` | 1 | 公开 |
@@ -108,7 +109,7 @@
 
 | 文件 | 大小 | 说明 |
 |------|------|------|
-| `init_database_mysql.sql` | ~22 KB | 完整 MySQL DDL + 测试数据 (11表, 含 new_password 列) |
+| `init_database_mysql.sql` | ~30 KB | 完整 MySQL DDL + 丰富测试数据 (11表, 35用户, 265+条记录) |
 | `init_database.sql` | 24.8 KB | SQL Server 版 DDL (同结构，不同语法) |
 | `config.ini.example` | ~1 KB | 数据库/系统/Web/选课 配置模板（含 [web] 段 jwt_secret） |
 | `settings.py` | ~5 KB | ConfigParser 配置读取单例 |
@@ -138,18 +139,19 @@
 | 路径 | 组件 | 角色 |
 |------|------|------|
 | `/login` | LoginView | public |
-| `/admin/students` | AdminStudents | admin |
+| `admin/students` | AdminStudents | admin |
 | `/admin/teachers` | AdminTeachers | admin |
 | `/admin/courses` | AdminCourses | admin |
 | `/admin/course-plans` | AdminCoursePlans | admin |
 | `/admin/audit` | AdminAudit | admin |
 | `/admin/enrollment-stats` | AdminEnrollmentStats | admin |
+| `/admin/enrollment-control` | AdminEnrollmentControl | admin |
 | `/admin/logs` | AdminLogs | admin |
 | `/teacher/plans` | TeacherPlans | teacher |
 | `/teacher/grades` | TeacherGrades | teacher |
 | `/teacher/grade-modify` | TeacherGradeModify | teacher |
 | `/teacher/stats` | TeacherStats | teacher |
-| `/student/enroll` | StudentEnroll | student |
+| `student/enroll` | StudentEnroll | student |
 | `/student/my-courses` | StudentSchedule | student |
 | `/student/grades` | StudentGrades | student |
 | `/student/stats` | StudentStats | student |
@@ -167,6 +169,7 @@
 | `AdminAudit.vue` | 7.2 KB | 三合一审核中心 (密码重置/成绩/课程) |
 | `AdminEnrollmentStats.vue` | 1.8 KB | 选课统计 (容量/已选进度条) |
 | `AdminLogs.vue` | 2.3 KB | 操作日志分页查询 |
+| `AdminEnrollmentControl.vue` | ~2 KB | 选课时段控制（学期CRUD + 选课开关）|
 
 **教师端 (4个)**
 
@@ -177,7 +180,7 @@
 | `TeacherGradeModify.vue` | 2.9 KB | 成绩修改申请 |
 | `TeacherStats.vue` | 3.9 KB | 班级统计/分数段分布/排名 |
 
-**学生端 (3个)**
+**学生端 (4个)**
 
 | 文件 | 大小 | 功能 |
 |------|------|------|
@@ -228,7 +231,8 @@
 | 文件 | 大小 | 说明 |
 |------|------|------|
 | `README.md` | 6.4 KB | 项目说明、技术栈、快速开始、默认账号、上课时间表 |
-| `API.md` | 15.8 KB | 完整 API 文档 (46端点, 请求/响应示例, 错误码) |
+| `API.md` | 15.8 KB | 完整 API 文档 (48端点, 请求/响应示例, 错误码) |
+| `DEBUG.md` | ~8 KB | Debug 调试文档（PyCharm 配置、常见问题、日志、数据库调试）|
 | `CLOUD_MIGRATION.md` | 9.5 KB | 腾讯云轻量服务器迁移教程 (Nginx + Flask + MySQL) |
 | `SETUP_PARTNER.md` | ~5 KB | 开发伙伴协作指南（完整分发/浏览器直连/前端代理三模式） |
 | `SQL_SERVER_SETUP_GUIDE.md` | ~12 KB | SQL Server + SSMS + ODBC 安装与配置完整指南 |
