@@ -1,13 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
-// API base URL — determined at BUILD time by VITE_API_TARGET env var.
-// In dev mode (npm run dev), the Vite proxy at /api forwards to the
-// actual backend. In production, __API_BASE__ is injected by vite.config.js
-// as a full URL (e.g. https://api.your-domain.com).
-//
-// If neither is set, defaults to '/api' which works when Flask serves
-// both frontend and backend from the same origin (legacy mode).
 const API_BASE = (typeof __API_BASE__ !== 'undefined') ? __API_BASE__ : '/api'
 
 const request = axios.create({
@@ -15,7 +8,33 @@ const request = axios.create({
   timeout: 10000,
 })
 
-// Request interceptor: attach JWT token
+let _redirecting = false
+
+function redirectToLogin() {
+  if (_redirecting) return
+  _redirecting = true
+  // Import router lazily to avoid circular dependency at module init time.
+  // At runtime the router is always installed before any request fires.
+  import('@/router').then(({ default: router }) => {
+    router.push('/login').catch(() => {
+      window.location.href = '/login'
+    })
+  }).catch(() => {
+    window.location.href = '/login'
+  })
+  // Belt-and-suspenders: if the dynamic import hangs (should never happen),
+  // fall back to hard redirect after 800ms.
+  setTimeout(() => {
+    if (_redirecting) {
+      window.location.href = '/login'
+    }
+  }, 800)
+}
+
+export function resetRedirectFlag() {
+  _redirecting = false
+}
+
 request.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
@@ -24,10 +43,9 @@ request.interceptors.request.use(
     }
     return config
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 )
 
-// Response interceptor: unified error handling
 request.interceptors.response.use(
   (response) => {
     const data = response.data
@@ -41,25 +59,25 @@ request.interceptors.response.use(
       const status = error.response.status
       const msg = error.response.data?.message
       if (status === 401) {
-        ElMessage.error(msg || 'Login expired, please re-login')
-        localStorage.removeItem('token')
-        localStorage.removeItem('role')
-        localStorage.removeItem('user_id')
-        // Use a small delay so ElMessage has time to render before
-        // the hard redirect tears down the Vue app.  The setTimeout
-        // also prevents rapid redirect loops when multiple parallel
-        // requests all get 401 at the same time.
-        setTimeout(() => { window.location.href = '/login' }, 300)
+        if (!_redirecting) {
+          ElMessage.error(msg || '登录已过期，请重新登录')
+          localStorage.removeItem('token')
+          localStorage.removeItem('role')
+          localStorage.removeItem('user_id')
+          redirectToLogin()
+        }
+        // If already redirecting, silently reject — don't stack messages or navigations.
+        return Promise.reject(error)
       } else if (status === 403) {
-        ElMessage.error(msg || 'Permission denied')
+        ElMessage.error(msg || '权限不足')
       } else {
-        ElMessage.error(msg || 'Server error')
+        ElMessage.error(msg || '服务器错误')
       }
     } else {
-      ElMessage.error('Network error')
+      ElMessage.error('网络异常')
     }
     return Promise.reject(error)
-  }
+  },
 )
 
 export default request

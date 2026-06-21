@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { resetRedirectFlag } from '@/utils/request'
 
 const routes = [
   {
@@ -50,13 +51,12 @@ const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
-  // Access the store INSIDE the guard so Pinia is already installed.
-  // Calling useAuthStore() at module level causes the guard to run
-  // before app.use(pinia), producing a "getActivePinia()" error that
-  // silently swallows navigation and freezes the login page.
   const auth = useAuthStore()
 
   if (to.meta.public) {
+    // Reset the 401 redirect guard so the user can re-login without
+    // being caught in the stale _redirecting=true state.
+    resetRedirectFlag()
     if (auth.isLoggedIn && to.path === '/login') {
       if (auth.isAdmin) return next('/admin/students')
       if (auth.isTeacher) return next('/teacher/plans')
