@@ -6,6 +6,9 @@ import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import axios from 'axios'
 
+import 'echarts'
+import VueECharts from 'vue-echarts'
+
 import App from './App.vue'
 import router from './router'
 import './styles/global.scss'
@@ -26,6 +29,7 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })
+app.component('v-chart', VueECharts)
 
 // Global registration of Element Plus icons
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {

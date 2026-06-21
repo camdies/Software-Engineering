@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="dialogVisible" title="修改密码" width="400px" @close="reset">
+  <el-dialog v-model="dialogVisible" title="修改密码" width="420px" @close="reset">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
       <el-form-item label="原密码" prop="old_password">
         <el-input v-model="form.old_password" type="password" show-password />
@@ -13,7 +13,7 @@
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" :loading="loading" @click="submit">确认</el-button>
+      <el-button type="primary" :loading="loading" @click="submit">确认修改</el-button>
     </template>
   </el-dialog>
 </template>

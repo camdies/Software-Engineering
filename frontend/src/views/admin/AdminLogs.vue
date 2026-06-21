@@ -1,9 +1,13 @@
 <template>
   <div class="page-card">
+    <div class="page-header">
+      <h1>操作日志</h1>
+    </div>
+
     <div class="page-toolbar">
       <div class="search-group">
-        <el-input v-model="search.user_id" placeholder="用户ID" clearable style="width:130px" @change="fetchData" />
-        <el-select v-model="search.log_type" placeholder="日志类型" clearable style="width:120px" @change="fetchData">
+        <el-input v-model="search.user_id" placeholder="用户ID" clearable @change="fetchData" />
+        <el-select v-model="search.log_type" placeholder="日志类型" clearable @change="fetchData">
           <el-option label="登录" value="登录" />
           <el-option label="选课" value="选课" />
           <el-option label="成绩" value="成绩" />
@@ -17,21 +21,25 @@
       <el-table-column prop="log_time" label="时间" width="170">
         <template #default="{ row }">{{ row.log_time?.slice(0, 19) }}</template>
       </el-table-column>
-      <el-table-column prop="user_id" label="用户" width="100" />
-      <el-table-column prop="log_type" label="类型" width="70">
+      <el-table-column prop="user_id" label="用户" width="110" />
+      <el-table-column label="类型" width="80">
         <template #default="{ row }"><el-tag size="small">{{ row.log_type }}</el-tag></template>
       </el-table-column>
-      <el-table-column prop="operation" label="操作描述" min-width="200" />
-      <el-table-column prop="result" label="结果" width="70">
+      <el-table-column prop="operation" label="操作描述" min-width="220" show-overflow-tooltip />
+      <el-table-column label="结果" width="80">
         <template #default="{ row }">
-          <el-tag size="small" :type="row.result === '成功' ? 'success' : 'danger'">{{ row.result }}</el-tag>
+          <span class="status-tag" :class="row.result === '成功' ? 'status-approved' : 'status-rejected'">
+            {{ row.result }}
+          </span>
         </template>
       </el-table-column>
-      <el-table-column prop="ip_address" label="IP" width="130" />
+      <el-table-column prop="ip_address" label="IP" width="140" />
     </el-table>
 
-    <el-pagination v-model:current-page="page" :total="total" :page-size="50" layout="total, prev, pager, next"
-      @current-change="fetchData" />
+    <el-pagination
+      v-model:current-page="page" :total="total" :page-size="50"
+      layout="total, prev, pager, next" @current-change="fetchData"
+    />
   </div>
 </template>
 

@@ -2,6 +2,7 @@
 
 GET  /api/stats/class/<plan_id>      — 班级成绩统计
 GET  /api/stats/distribution/<plan_id> — 成绩分布
+GET  /api/stats/gpa-trend            — GPA趋势 (学生用)
 POST /api/stats/export               — 统计数据导出 Excel
 """
 
@@ -34,6 +35,15 @@ def get_class_stats(plan_id):
 @require_role("teacher", "admin")
 def get_score_distribution(plan_id):
     result = StatsController().get_score_distribution(plan_id)
+    return success_response(result)
+
+
+@stats_bp.route("/gpa-trend", methods=["GET"])
+@require_auth
+@require_role("student", "teacher", "admin")
+def get_gpa_trend():
+    student_id = request.args.get("student_id") or g.current_user["user_id"]
+    result = StatsController().get_gpa_trend(student_id)
     return success_response(result)
 
 

@@ -1,23 +1,30 @@
 <template>
   <div class="page-card">
-    <h3 style="margin:0 0 12px">成绩查询</h3>
+    <div class="page-header">
+      <h1>成绩查询</h1>
+    </div>
+
     <el-table :data="grades" stripe v-loading="loading" empty-text="暂无成绩">
-      <el-table-column prop="course_name" label="课程名称" min-width="160" />
-      <el-table-column prop="semester" label="学期" width="100" />
+      <el-table-column prop="course_name" label="课程名称" min-width="180" />
+      <el-table-column prop="semester" label="学期" width="120" />
       <el-table-column prop="credit" label="学分" width="70" />
       <el-table-column label="成绩" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.score >= 90 ? 'success' : row.score >= 60 ? '' : 'danger'" effect="dark">
+          <el-tag :type="row.score >= 90 ? 'success' : row.score >= 60 ? '' : 'danger'" effect="dark" size="small">
             {{ row.score ?? '--' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="gpa_point" label="绩点" width="70" />
-      <el-table-column prop="status" label="状态" width="90">
+      <el-table-column label="绩点" width="70">
         <template #default="{ row }">
-          <el-tag size="small" :type="row.status === '正常' ? 'success' : row.status === '待审核' ? 'warning' : ''">
+          <span class="text-mono">{{ row.gpa_point ?? '--' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="状态" width="90">
+        <template #default="{ row }">
+          <span class="status-tag" :class="row.status === '正常' ? 'status-approved' : row.status === '待审核' ? 'status-pending' : 'status-default'">
             {{ row.status }}
-          </el-tag>
+          </span>
         </template>
       </el-table-column>
     </el-table>
@@ -28,8 +35,7 @@
 import { ref, onMounted } from 'vue'
 import request from '@/utils/request'
 
-const loading = ref(false)
-const grades = ref([])
+const loading = ref(false), grades = ref([])
 
 onMounted(fetchData)
 
@@ -41,3 +47,7 @@ async function fetchData() {
   } finally { loading.value = false }
 }
 </script>
+
+<style scoped>
+.text-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-scale-sm); color: var(--neutral-600); }
+</style>

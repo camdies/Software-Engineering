@@ -331,3 +331,53 @@ class StatsController:
         except Exception as e:
             logger.error(f"获取课表数据异常: {e}", exc_info=True)
             return {"schedule": []}
+
+    def get_gpa_trend(self, student_id: str) -> dict:
+        try:
+            from backend.utils.gpa_calculator import calculate_cumulative_gpa
+
+            with self._db.get_session() as session:
+                grades = (
+                    session.query(Grade, CoursePlan, Course)
+                    .join(CoursePlan, Grade.plan_id == CoursePlan.plan_id)
+                    .join(Course, CoursePlan.course_id == Course.course_id)
+                    .filter(Grade.student_id == student_id)
+                    .order_by(CoursePlan.semester)
+                    .all()
+                )
+
+                if not grades:
+                    return {"semesters": [], "overall_gpa": 0.0}
+
+                semester_map = {}
+                for grade, plan, course in grades:
+                    sem = plan.semester or "未知学期"
+                    if sem not in semester_map:
+                        semester_map[sem] = []
+                    semester_map[sem].append({
+                        "gpa_point": float(grade.gpa_point or 0),
+                        "credit": float(course.credit or 0),
+                    })
+
+                semesters = []
+                all_items = []
+                for sem, items in semester_map.items():
+                    sem_gpa = calculate_cumulative_gpa(items)
+                    semesters.append({
+                        "semester": sem,
+                        "gpa": sem_gpa,
+                        "credits": round(sum(i["credit"] for i in items), 1),
+                        "course_count": len(items),
+                    })
+                    all_items.extend(items)
+
+                overall_gpa = calculate_cumulative_gpa(all_items)
+
+                return {
+                    "semesters": semesters,
+                    "overall_gpa": overall_gpa,
+                }
+
+        except Exception as e:
+            logger.error(f"GPA趋势异常: {e}", exc_info=True)
+            return {"semesters": [], "overall_gpa": 0.0}

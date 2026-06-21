@@ -1,31 +1,37 @@
 <template>
   <div class="page-card">
+    <div class="page-header">
+      <h1>学生管理</h1>
+      <el-button type="primary" @click="openDialog()">新增学生</el-button>
+    </div>
+
     <div class="page-toolbar">
       <div class="search-group">
-        <el-input v-model="search.student_id" placeholder="学号" clearable style="width:130px" @change="fetchData" />
-        <el-input v-model="search.name" placeholder="姓名" clearable style="width:130px" @change="fetchData" />
-        <el-input v-model="search.class_name" placeholder="班级" clearable style="width:130px" @change="fetchData" />
+        <el-input v-model="search.student_id" placeholder="学号" clearable @change="fetchData" />
+        <el-input v-model="search.name" placeholder="姓名" clearable @change="fetchData" />
+        <el-input v-model="search.class_name" placeholder="班级" clearable @change="fetchData" />
       </div>
-      <el-button type="primary" @click="openDialog()">新增学生</el-button>
     </div>
 
     <el-table :data="list" stripe v-loading="loading">
       <el-table-column prop="student_id" label="学号" width="130" />
-      <el-table-column prop="name" label="姓名" width="90" />
-      <el-table-column prop="grade" label="年级" width="70" />
-      <el-table-column prop="major" label="专业" width="120" />
-      <el-table-column prop="class_name" label="班级" width="100" />
+      <el-table-column prop="name" label="姓名" width="100" />
+      <el-table-column prop="grade" label="年级" width="80" />
+      <el-table-column prop="major" label="专业" min-width="140" />
+      <el-table-column prop="class_name" label="班级" width="110" />
       <el-table-column prop="email" label="邮箱" min-width="160" />
-      <el-table-column label="操作" width="140" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openDialog(row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="del(row.student_id)">删除</el-button>
+          <el-button size="small" type="danger" plain @click="del(row.student_id)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <el-pagination v-model:current-page="page" :total="total" :page-size="20" layout="total, prev, pager, next"
-      @current-change="fetchData" />
+    <el-pagination
+      v-model:current-page="page" :total="total" :page-size="20"
+      layout="total, prev, pager, next" @current-change="fetchData"
+    />
 
     <el-dialog v-model="dialogVisible" :title="editing ? '编辑学生' : '新增学生'" width="520px">
       <el-form ref="formRef" :model="form" label-width="80px">
@@ -40,7 +46,9 @@
         <el-form-item label="联系方式"><el-input v-model="form.contact" /></el-form-item>
         <el-form-item v-if="!editing" label="默认密码">
           <el-input v-model="form.password" show-password placeholder="留空则默认123456" />
-          <span style="font-size:11px;color:#909399">系统自动以此学号注册账号，密码默认123456</span>
+          <span style="font-size:var(--text-scale-2xs);color:var(--neutral-400)">
+            系统自动以此学号注册账号，密码默认123456
+          </span>
         </el-form-item>
       </el-form>
       <template #footer>

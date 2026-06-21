@@ -1,31 +1,37 @@
 <template>
   <div class="page-card">
-    <div class="page-toolbar">
-      <div class="search-group">
-        <el-input v-model="search.course_id" placeholder="课程代码" clearable style="width:130px" @change="fetchData" />
-        <el-input v-model="search.course_name" placeholder="课程名称" clearable style="width:150px" @change="fetchData" />
-      </div>
+    <div class="page-header">
+      <h1>课程管理</h1>
       <el-button type="primary" @click="openDialog()">新增课程</el-button>
     </div>
 
+    <div class="page-toolbar">
+      <div class="search-group">
+        <el-input v-model="search.course_id" placeholder="课程代码" clearable @change="fetchData" />
+        <el-input v-model="search.course_name" placeholder="课程名称" clearable @change="fetchData" />
+      </div>
+    </div>
+
     <el-table :data="list" stripe v-loading="loading">
-      <el-table-column prop="course_id" label="课程代码" width="110" />
-      <el-table-column prop="course_name" label="课程名称" min-width="160" />
+      <el-table-column prop="course_id" label="课程代码" width="120" />
+      <el-table-column prop="course_name" label="课程名称" min-width="180" />
       <el-table-column prop="credit" label="学分" width="70" />
       <el-table-column prop="hours" label="学时" width="70" />
-      <el-table-column prop="exam_type" label="考核方式" width="100" />
-      <el-table-column label="操作" width="140" fixed="right">
+      <el-table-column prop="exam_type" label="考核方式" width="90" />
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openDialog(row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="del(row.course_id)">删除</el-button>
+          <el-button size="small" type="danger" plain @click="del(row.course_id)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <el-pagination v-model:current-page="page" :total="total" :page-size="20" layout="total, prev, pager, next"
-      @current-change="fetchData" />
+    <el-pagination
+      v-model:current-page="page" :total="total" :page-size="20"
+      layout="total, prev, pager, next" @current-change="fetchData"
+    />
 
-    <el-dialog v-model="dialogVisible" :title="editing ? '编辑课程' : '新增课程'" width="460px">
+    <el-dialog v-model="dialogVisible" :title="editing ? '编辑课程' : '新增课程'" width="480px">
       <el-form ref="formRef" :model="form" label-width="80px">
         <el-form-item label="课程代码" required>
           <el-input v-model="form.course_id" :disabled="!!editing" />

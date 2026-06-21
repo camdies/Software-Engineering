@@ -1,27 +1,25 @@
 <template>
   <div class="page-card">
-    <div class="page-toolbar">
-      <h3 style="margin:0">个人课表查询</h3>
-      <div style="display:flex;gap:8px">
-        <el-button @click="exportExcel" icon="Download">导出 Excel</el-button>
-        <el-button type="primary" @click="exportPDF" icon="Printer">导出 PDF</el-button>
+    <div class="page-header">
+      <h1>个人课表</h1>
+      <div style="display:flex;gap:var(--space-2)">
+        <el-button @click="exportExcel">导出 Excel</el-button>
+        <el-button type="primary" @click="exportPDF">导出 PDF</el-button>
       </div>
     </div>
 
-    <!-- 学期和统计信息 -->
-    <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+    <div class="schedule-tags">
       <el-tag size="large" type="info">学期: {{ semester }}</el-tag>
       <el-tag size="large" type="success">总周数: {{ totalWeeks }}周</el-tag>
-      <el-tag size="large" type="warning">已选课程: {{ myCourses.length }}门</el-tag>
-      <el-tag size="large">总学分: {{ totalCredits.toFixed(1) }}</el-tag>
+      <el-tag size="large" type="warning">已选: {{ myCourses.length }}门</el-tag>
+      <el-tag size="large">学分: {{ totalCredits.toFixed(1) }}</el-tag>
     </div>
 
-    <!-- 周课表表格 -->
     <div class="schedule-wrapper" ref="scheduleRef">
       <table class="schedule-table">
         <thead>
           <tr>
-            <th class="time-col">节次/时间</th>
+            <th class="time-col">节次 / 时间</th>
             <th v-for="(name, idx) in weekdayNames" :key="idx" class="day-col">{{ name }}</th>
           </tr>
         </thead>
@@ -45,21 +43,20 @@
       </table>
     </div>
 
-    <!-- 课程详情列表（表格形式） -->
-    <h4 style="margin:20px 0 12px">已选课程详情</h4>
-    <el-table :data="myCourses" stripe border size="small" style="width:100%">
-      <el-table-column prop="course_id" label="课程代码" width="100" />
-      <el-table-column prop="course_name" label="课程名称" min-width="150" />
-      <el-table-column label="上课时间" width="200">
+    <h4 style="margin:var(--space-6) 0 var(--space-3)">已选课程详情</h4>
+    <el-table :data="myCourses" stripe border size="small">
+      <el-table-column prop="course_id" label="课程代码" width="110" />
+      <el-table-column prop="course_name" label="课程名称" min-width="160" />
+      <el-table-column label="上课时间" min-width="220">
         <template #default="{ row }">{{ row.time_slot }}</template>
       </el-table-column>
-      <el-table-column label="教学周" width="120">
+      <el-table-column label="教学周" width="130">
         <template #default="{ row }">{{ row.start_week || 1 }}-{{ row.end_week || 20 }}周</template>
       </el-table-column>
-      <el-table-column prop="location" label="地点" width="120" />
+      <el-table-column prop="location" label="地点" width="130" />
       <el-table-column prop="credit" label="学分" width="70" />
       <el-table-column prop="exam_type" label="考核" width="70" />
-      <el-table-column prop="semester" label="学期" width="120" />
+      <el-table-column prop="semester" label="学期" width="130" />
     </el-table>
   </div>
 </template>
@@ -76,10 +73,7 @@ const periodTimes = [
   '19:00-19:40', '19:50-20:30', '20:40-21:20',
 ]
 
-const myCourses = ref([])
-const scheduleRef = ref(null)
-const semester = ref('')
-const totalWeeks = ref(20)
+const myCourses = ref([]), scheduleRef = ref(null), semester = ref(''), totalWeeks = ref(20)
 
 const totalCredits = computed(() => {
   return myCourses.value.reduce((sum, c) => sum + (parseFloat(c.credit) || 0), 0)
@@ -95,73 +89,60 @@ onMounted(async () => {
 
 function getCoursesAt(day, period) {
   return myCourses.value.filter(c =>
-    c.weekday === day &&
-    c.period_start <= period &&
-    c.period_start + c.period_count - 1 >= period &&
-    period === c.period_start
+    c.weekday === day && c.period_start <= period &&
+    c.period_start + c.period_count - 1 >= period && period === c.period_start
   )
 }
 
 function blockStyle(course) {
   const h = (course.period_count || 2) * 48
-  // Use a deterministic palette: each plan_id maps to a distinct color
   const palette = [
-    { bg: '#dbeafe', border: '#3b82f6' }, // blue
-    { bg: '#dcfce7', border: '#22c55e' }, // green
-    { bg: '#fef3c7', border: '#f59e0b' }, // amber
-    { bg: '#fce7f3', border: '#ec4899' }, // pink
-    { bg: '#e0e7ff', border: '#6366f1' }, // indigo
-    { bg: '#ccfbf1', border: '#14b8a6' }, // teal
-    { bg: '#fef2f2', border: '#ef4444' }, // red
-    { bg: '#f3e8ff', border: '#a855f7' }, // purple
-    { bg: '#fff7ed', border: '#f97316' }, // orange
-    { bg: '#ecfeff', border: '#06b6d4' }, // cyan
+    { bg: '#dbeafe', border: '#3b82f6' },
+    { bg: '#dcfce7', border: '#22c55e' },
+    { bg: '#fef3c7', border: '#f59e0b' },
+    { bg: '#fce7f3', border: '#ec4899' },
+    { bg: '#e0e7ff', border: '#6366f1' },
+    { bg: '#ccfbf1', border: '#14b8a6' },
+    { bg: '#fef2f2', border: '#ef4444' },
+    { bg: '#f3e8ff', border: '#a855f7' },
+    { bg: '#fff7ed', border: '#f97316' },
+    { bg: '#ecfeff', border: '#06b6d4' },
   ]
   const idx = (course.plan_id || 0) % palette.length
-  return {
-    height: `${h}px`,
-    background: palette[idx].bg,
-    borderLeft: `3px solid ${palette[idx].border}`,
-  }
+  return { height: `${h}px`, background: palette[idx].bg, borderLeft: `3px solid ${palette[idx].border}` }
 }
 
 async function exportExcel() {
   try {
-    const res = await request.post('/stats/export', {
-      type: 'schedule',
-      student_id: '',
-    }, { responseType: 'blob' })
+    const res = await request.post('/stats/export', { type: 'schedule', student_id: '' }, { responseType: 'blob' })
     const url = URL.createObjectURL(res)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = '个人课表.xlsx'
-    a.click()
+    const a = document.createElement('a'); a.href = url; a.download = '个人课表.xlsx'; a.click()
     URL.revokeObjectURL(url)
   } catch {
-    const periodTimesLocal = [
+    const t = [
       '08:30-09:10', '09:20-10:00', '10:20-11:00', '11:10-11:50',
       '14:30-15:10', '15:20-16:00', '16:10-16:50', '17:00-17:40',
       '19:00-19:40', '19:50-20:30', '20:40-21:20',
     ]
-    let html = '<html><head><meta charset="utf-8"><title>个人课表</title></head><body>'
-    html += '<h2>个人课表</h2><table border="1" cellpadding="4" cellspacing="0">'
-    html += '<tr><th>节次/时间</th>' + weekdayNames.map(w => `<th>${w}</th>`).join('') + '</tr>'
+    let h = '<html><head><meta charset="utf-8"><title>个人课表</title></head><body>'
+    h += '<h2>个人课表</h2><table border="1" cellpadding="4" cellspacing="0">'
+    h += '<tr><th>节次/时间</th>' + weekdayNames.map(w => `<th>${w}</th>`).join('') + '</tr>'
     for (let p = 1; p <= 11; p++) {
-      html += `<tr><td>第${p}节<br/>${periodTimesLocal[p - 1]}</td>`
+      h += `<tr><td>第${p}节<br/>${t[p - 1]}</td>`
       for (let d = 1; d <= 7; d++) {
-        const courses = getCoursesAt(d, p)
-        html += `<td>${courses.map(c => `${c.course_name}<br/>${c.location || ''}<br/>${c.start_week}-${c.end_week}周`).join('<br/>') || ''}</td>`
+        const cs = getCoursesAt(d, p)
+        h += `<td>${cs.map(c => `${c.course_name}<br/>${c.location || ''}<br/>${c.start_week}-${c.end_week}周`).join('<br/>') || ''}</td>`
       }
-      html += '</tr>'
+      h += '</tr>'
     }
-    html += '</table></body></html>'
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel' })
+    h += '</table></body></html>'
+    const blob = new Blob([h], { type: 'application/vnd.ms-excel' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '个人课表.xls'; a.click()
   }
 }
 
 function exportPDF() {
-  const periodTimesLocal = [
+  const t = [
     '08:30-09:10', '09:20-10:00', '10:20-11:00', '11:10-11:50',
     '14:30-15:10', '15:20-16:00', '16:10-16:50', '17:00-17:40',
     '19:00-19:40', '19:50-20:30', '20:40-21:20',
@@ -185,32 +166,30 @@ function exportPDF() {
   w.document.write('<table>')
   w.document.write(`<tr><th class="time-col">节次/时间</th>${weekdayNames.map(n => `<th>${n}</th>`).join('')}</tr>`)
   for (let p = 1; p <= 11; p++) {
-    w.document.write(`<tr><td class="time-col">第${p}节<br/><small>${periodTimesLocal[p - 1]}</small></td>`)
+    w.document.write(`<tr><td class="time-col">第${p}节<br/><small>${t[p - 1]}</small></td>`)
     for (let d = 1; d <= 7; d++) {
-      const courses = getCoursesAt(d, p)
-      const cells = courses.map(c => `${c.course_name}<br/>${c.location || ''}`).join('<br/>') || ''
-      w.document.write(`<td class="${courses.length > 0 ? 'has-course' : ''}">${cells}</td>`)
+      const cs = getCoursesAt(d, p)
+      const cells = cs.map(c => `${c.course_name}<br/>${c.location || ''}`).join('<br/>') || ''
+      w.document.write(`<td class="${cs.length > 0 ? 'has-course' : ''}">${cells}</td>`)
     }
     w.document.write('</tr>')
   }
-  w.document.write('</table>')
-  w.document.write('</body></html>')
+  w.document.write('</table></body></html>')
   w.document.close()
   setTimeout(() => w.print(), 500)
 }
 </script>
 
 <style scoped>
+.schedule-tags { display: flex; gap: var(--space-3); margin-bottom: var(--space-4); flex-wrap: wrap; }
 .schedule-wrapper { overflow-x: auto; }
 .schedule-table { width: 100%; border-collapse: collapse; min-width: 900px; }
-.schedule-table th, .schedule-table td {
-  border: 1px solid #e4e7ed; text-align: center; vertical-align: top;
-}
-.schedule-table th { background: #f5f7fa; padding: 8px; font-weight: 500; color: #606266; }
+.schedule-table th, .schedule-table td { border: 1px solid var(--neutral-200); text-align: center; vertical-align: top; }
+.schedule-table th { background: var(--neutral-50); padding: var(--space-2); font-weight: var(--weight-semibold); color: var(--neutral-600); font-size: var(--text-scale-sm); }
 .time-col { width: 100px; }
-.time-cell { padding: 4px; font-size: 12px; }
-.period-num { font-weight: 500; color: #303133; }
-.period-time { color: #909399; font-size: 11px; }
+.time-cell { padding: 4px; font-size: var(--text-scale-sm); }
+.period-num { font-weight: var(--weight-medium); color: var(--neutral-700); }
+.period-time { color: var(--neutral-400); font-size: var(--text-scale-2xs); }
 .slot-cell { width: calc((100% - 100px) / 7); height: 48px; position: relative; padding: 0; }
 .course-block {
   position: absolute; top: 0; left: 0; right: 0;
@@ -218,7 +197,7 @@ function exportPDF() {
   display: flex; flex-direction: column; justify-content: center;
   z-index: 2; overflow: hidden;
 }
-.cb-name { font-size: 12px; font-weight: 500; color: #303133; line-height: 1.3; }
-.cb-loc { font-size: 10px; color: #606266; }
-.cb-weeks { font-size: 9px; color: #909399; }
+.cb-name { font-size: var(--text-scale-xs); font-weight: var(--weight-medium); color: var(--neutral-700); line-height: 1.3; }
+.cb-loc { font-size: var(--text-scale-2xs); color: var(--neutral-500); }
+.cb-weeks { font-size: 9px; color: var(--neutral-400); }
 </style>
