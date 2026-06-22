@@ -1,5 +1,4 @@
-# Web 版新增依赖
-# PySide6 和 PyQt5 在 Web 版中不再需要，但保留以免影响测试
+# Web-version additional dependencies
 Flask>=3.0.0
 flask-cors>=4.0.0
 PyJWT>=2.8.0

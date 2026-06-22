@@ -1,16 +1,16 @@
 # ================================================================
 # 高校教务管理系统 - Python 依赖
 # ================================================================
-# Web 框架
+# Web framework
 Flask>=3.0.0
 flask-cors>=4.0.0
 PyJWT>=2.8.0
-# MySQL (默认数据库)
+# MySQL
 PyMySQL>=1.1.0
-# SQL Server (可选，需额外安装 ODBC Driver 18)
+# SQL Server (optional, requires ODBC Driver 18)
 # pyodbc>=5.0.0
 # pymssql>=2.3.0
-# 通用
+# Common
 SQLAlchemy>=2.0.0
 bcrypt>=4.0.0
 openpyxl>=3.1.0
