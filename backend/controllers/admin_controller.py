@@ -20,6 +20,17 @@ from backend.utils.log_util import get_logger
 logger = get_logger("admin_controller")
 
 
+def _parse_datetime(value: str, fmt: str = "%Y-%m-%d %H:%M:%S"):
+    """Parse a datetime string, accepting both ISO and space-separated formats."""
+    if not value:
+        return None
+    from datetime import datetime
+    try:
+        return datetime.strptime(value, fmt)
+    except ValueError:
+        return datetime.fromisoformat(value)
+
+
 class AdminController:
     """管理员业务控制器。
 
@@ -492,9 +503,9 @@ class AdminController:
                     end_date=dt_date.fromisoformat(end_date) if end_date else None,
                     is_current=1 if is_current else 0,
                     enrollment_open=1 if enrollment_open else 0,
-                    enroll_start=datetime.strptime(enroll_start, "%Y-%m-%d %H:%M:%S")
+                    enroll_start=_parse_datetime(enroll_start, "%Y-%m-%d %H:%M:%S")
                     if enroll_start else None,
-                    enroll_end=datetime.strptime(enroll_end, "%Y-%m-%d %H:%M:%S")
+                    enroll_end=_parse_datetime(enroll_end, "%Y-%m-%d %H:%M:%S")
                     if enroll_end else None,
                 )
                 if is_current:
@@ -541,11 +552,11 @@ class AdminController:
                 if "enrollment_open" in kwargs:
                     config.enrollment_open = 1 if kwargs["enrollment_open"] else 0
                 if "enroll_start" in kwargs and kwargs["enroll_start"]:
-                    config.enroll_start = datetime.strptime(
-                        kwargs["enroll_start"], "%Y-%m-%d %H:%M:%S")
+                    val = kwargs["enroll_start"]
+                    config.enroll_start = _parse_datetime(val, "%Y-%m-%d %H:%M:%S")
                 if "enroll_end" in kwargs and kwargs["enroll_end"]:
-                    config.enroll_end = datetime.strptime(
-                        kwargs["enroll_end"], "%Y-%m-%d %H:%M:%S")
+                    val = kwargs["enroll_end"]
+                    config.enroll_end = _parse_datetime(val, "%Y-%m-%d %H:%M:%S")
 
                 self._write_log(session, "admin", "系统",
                                 f"更新学期配置: {config.semester}", "成功", "")

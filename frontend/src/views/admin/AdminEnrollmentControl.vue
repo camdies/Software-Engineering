@@ -83,7 +83,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
 
@@ -144,6 +144,29 @@ async function del(id) {
 }
 
 onMounted(fetchData)
+
+let computing = false
+
+watch([() => form.start_date, () => form.end_date], ([sd, ed]) => {
+  if (computing || !sd || !ed) return
+  const ms = new Date(ed).getTime() - new Date(sd).getTime()
+  if (ms <= 0) return
+  const weeks = Math.round(ms / (7 * 24 * 3600 * 1000))
+  if (weeks !== form.total_weeks) {
+    computing = true
+    form.total_weeks = weeks
+    computing = false
+  }
+})
+
+watch(() => form.total_weeks, (weeks) => {
+  if (computing || !form.start_date) return
+  computing = true
+  const start = new Date(form.start_date)
+  start.setDate(start.getDate() + weeks * 7)
+  form.end_date = start.toISOString().slice(0, 10)
+  computing = false
+})
 </script>
 
 <style scoped>
