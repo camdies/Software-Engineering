@@ -6,6 +6,7 @@ GET  /api/stats/gpa-trend            — GPA趋势 (学生用)
 POST /api/stats/export               — 统计数据导出 Excel
 """
 
+import io
 import os
 import tempfile
 
@@ -50,12 +51,6 @@ def get_gpa_trend():
 @stats_bp.route("/export", methods=["POST"])
 @require_auth
 def export_stats():
-    """导出统计数据为 Excel 文件。
-
-    请求体: {"type": "class", "plan_id": 1, "class_name": "..."}
-    或: {"type": "academic", "student_id": "S001"}
-    或: {"type": "schedule", "student_id": "S001"}
-    """
     data = request.get_json(silent=True) or {}
     export_type = data.get("type", "class")
 
@@ -77,16 +72,26 @@ def export_stats():
     else:
         return error_response("不支持的导出类型")
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    # Use mkstemp so we can close the fd before openpyxl writes to the
+    # file — NamedTemporaryFile keeps the handle open, which blocks
+    # concurrent writes on Windows (mandatory file locking).
+    fd, path = tempfile.mkstemp(suffix=".xlsx")
+    os.close(fd)
     try:
-        StatsController().export_stats_to_excel(sd, tmp.name)
-        tmp.close()
-        return send_file(
-            tmp.name,
-            as_attachment=True,
-            download_name=f"stats_{export_type}.xlsx",
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
+        StatsController().export_stats_to_excel(sd, path)
+        # Read into memory so we can delete the temp file immediately.
+        # Flask's send_file() with a path can race with os.unlink() on
+        # Windows because the file read is deferred to the WSGI layer.
+        import io
+        with open(path, "rb") as f:
+            blob = f.read()
     finally:
-        if os.path.exists(tmp.name):
-            os.unlink(tmp.name)
+        if os.path.exists(path):
+            os.unlink(path)
+
+    return send_file(
+        io.BytesIO(blob),
+        as_attachment=True,
+        download_name=f"stats_{export_type}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )

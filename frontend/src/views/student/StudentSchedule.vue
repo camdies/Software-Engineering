@@ -115,7 +115,7 @@ function blockStyle(course) {
 async function exportExcel() {
   try {
     const res = await request.post('/stats/export', { type: 'schedule', student_id: '' }, { responseType: 'blob' })
-    const url = URL.createObjectURL(res)
+    const url = URL.createObjectURL(res.data)
     const a = document.createElement('a'); a.href = url; a.download = '个人课表.xlsx'; a.click()
     URL.revokeObjectURL(url)
   } catch {

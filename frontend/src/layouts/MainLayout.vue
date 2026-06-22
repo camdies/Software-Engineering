@@ -87,9 +87,9 @@
       </header>
 
       <main class="content-area">
-        <router-view v-slot="{ Component }">
+        <router-view v-slot="{ Component, route: resolved }">
           <transition name="fade-slide" mode="out-in">
-            <component :is="Component" />
+            <component :is="Component" :key="resolved.fullPath" />
           </transition>
         </router-view>
       </main>
@@ -100,7 +100,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
@@ -125,7 +125,12 @@ const showPwdDialog = ref(false)
 
 async function handleLogout() {
   await auth.logout()
-  router.push('/login')
+  await nextTick()
+  try {
+    await router.push('/login')
+  } catch (_) {
+    window.location.href = '/login'
+  }
 }
 </script>
 

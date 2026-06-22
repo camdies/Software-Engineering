@@ -182,7 +182,7 @@ const rankBarOpt = computed(() => {
 
 async function exportExcel() {
   const res = await request.post('/stats/export', { type: 'class', plan_id: selectedPlan.value }, { responseType: 'blob' })
-  const url = URL.createObjectURL(res)
+  const url = URL.createObjectURL(res.data)
   const a = document.createElement('a')
   a.href = url; a.download = '成绩统计.xlsx'; a.click()
   URL.revokeObjectURL(url)

@@ -137,24 +137,30 @@ class AdminController:
             return {"success": False, "message": "操作失败，请重试"}
 
     def delete_student(self, student_id: str) -> dict:
-        """删除学生（级联删除user_account）。"""
+        """删除学生及其所有关联数据。"""
         try:
+            from backend.models.enrollment import Enrollment
+            from backend.models.grade import Grade
+            from backend.models.password_reset_request import PasswordResetRequest
+
             with self._db.get_session() as session:
                 student = session.query(Student).filter_by(
                     student_id=student_id).first()
                 if student is None:
                     return {"success": False, "message": "学生不存在"}
 
-                # Delete UserAccount FIRST (parent), then Student (child).
-                # Student FK -> user_account is ON DELETE CASCADE.
-                # Explicit order prevents double-delete contention.
+                session.query(Enrollment).filter_by(
+                    student_id=student_id).delete()
+                session.query(Grade).filter_by(
+                    student_id=student_id).delete()
+                session.query(PasswordResetRequest).filter_by(
+                    user_id=student_id).delete()
+                session.flush()
+
                 account = session.query(UserAccount).filter_by(
                     user_id=student_id).first()
                 if account:
                     session.delete(account)
-                    session.flush()
-                # Now delete student (any remaining references)
-                session.delete(student)
 
                 self._write_log(session, "admin", "系统",
                                 f"删除学生: {student_id}", "成功", "")
@@ -166,6 +172,7 @@ class AdminController:
     def _write_log(self, session, user_id: str, log_type: str,
                    operation: str, result: str, ip_address: str = ""
                    ) -> None:
+        savepoint = session.begin_nested()
         try:
             log_entry = OperationLog(
                 user_id=user_id,
@@ -178,11 +185,7 @@ class AdminController:
             session.add(log_entry)
             session.flush()
         except Exception:
-            try:
-                session.rollback()
-                session.expunge(log_entry)
-            except Exception:
-                pass
+            savepoint.rollback()
             logger.warning(f"操作日志写入失败（已跳过）: user={user_id} {operation}")
 
     # ----- Teacher management -----
@@ -269,21 +272,34 @@ class AdminController:
             return {"success": False, "message": "操作失败，请重试"}
 
     def delete_teacher(self, teacher_id: str) -> dict:
-        """删除教师（级联删除user_account）。"""
+        """删除教师及其所有关联数据。"""
         try:
+            from backend.models.enrollment import Enrollment
+            from backend.models.grade import Grade
+            from backend.models.password_reset_request import PasswordResetRequest
+
             with self._db.get_session() as session:
                 teacher = session.query(Teacher).filter_by(
                     teacher_id=teacher_id).first()
                 if teacher is None:
                     return {"success": False, "message": "教师不存在"}
 
-                # Delete UserAccount FIRST (parent), then Teacher (child)
+                plans = session.query(CoursePlan).filter_by(
+                    teacher_id=teacher_id).all()
+                for plan in plans:
+                    session.query(Enrollment).filter_by(
+                        plan_id=plan.plan_id).delete()
+                    session.query(Grade).filter_by(
+                        plan_id=plan.plan_id).delete()
+                    session.delete(plan)
+                session.query(PasswordResetRequest).filter_by(
+                    user_id=teacher_id).delete()
+                session.flush()
+
                 account = session.query(UserAccount).filter_by(
                     user_id=teacher_id).first()
                 if account:
                     session.delete(account)
-                    session.flush()
-                session.delete(teacher)
 
                 self._write_log(session, "admin", "系统",
                                 f"删除教师: {teacher_id}", "成功", "")

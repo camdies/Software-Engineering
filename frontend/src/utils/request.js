@@ -48,6 +48,11 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   (response) => {
+    // For blob responses (file downloads), return the raw response so the
+    // caller can extract response.data (the Blob). Don't parse as JSON.
+    if (response.config.responseType === 'blob') {
+      return response
+    }
     const data = response.data
     if (data.success === false && data.message) {
       ElMessage.error(data.message)
