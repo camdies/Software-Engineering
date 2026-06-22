@@ -403,13 +403,21 @@ class AdminController:
             return {"success": False, "message": "操作失败，请重试"}
 
     def delete_course(self, course_id: str) -> dict:
-        """删除课程。"""
+        """删除课程及其关联开课计划。"""
         try:
             with self._db.get_session() as session:
                 course = session.query(Course).filter_by(
                     course_id=course_id).first()
                 if course is None:
                     return {"success": False, "message": "课程不存在"}
+                from backend.models.enrollment import Enrollment
+                from backend.models.grade import Grade
+                course_plans = session.query(CoursePlan).filter_by(course_id=course_id).all()
+                for plan in course_plans:
+                    session.query(Enrollment).filter_by(plan_id=plan.plan_id).delete()
+                    session.query(Grade).filter_by(plan_id=plan.plan_id).delete()
+                    session.delete(plan)
+                session.flush()
                 session.delete(course)
                 self._write_log(session, "admin", "系统",
                                 f"删除课程: {course_id}", "成功", "")

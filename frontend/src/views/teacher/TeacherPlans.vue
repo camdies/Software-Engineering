@@ -25,7 +25,8 @@
       <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
           <el-button v-if="row.status === '待审核'" size="small" @click="openDialog(row)">编辑</el-button>
-          <el-button v-if="row.status !== '待审核' && row.status !== '已停课'" size="small" type="warning" plain @click="stopCourse(row.plan_id)">停课</el-button>
+          <el-button v-if="row.status === '已通过'" size="small" type="warning" plain @click="stopCourse(row.plan_id)">停课</el-button>
+          <el-button v-if="row.status === '已停课'" size="small" type="success" plain @click="reopenCourse(row.plan_id)">开课</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -188,6 +189,12 @@ async function stopCourse(planId) {
   try { await ElMessageBox.confirm('确认停课？', '停课确认', { type: 'warning' }) } catch { return }
   await request.put(`/teacher/course-plan/${planId}`, { status: '已停课' })
   ElMessage.success('课程已停课'); fetchData()
+}
+
+async function reopenCourse(planId) {
+  try { await ElMessageBox.confirm('确认重新开课？', '开课确认', { type: 'info' }) } catch { return }
+  await request.put(`/teacher/course-plan/${planId}`, { status: '已通过' })
+  ElMessage.success('课程已恢复开课'); fetchData()
 }
 
 function statusClass(s) {

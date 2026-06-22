@@ -146,6 +146,18 @@ def update_course_plan(plan_id):
         plan = session.query(CoursePlan).filter_by(plan_id=plan_id, teacher_id=g.current_user["user_id"]).first()
         if not plan:
             return error_response("授课计划不存在或无权修改")
+
+        # Allow status-only transitions for approved/stopped plans
+        only_status = set(data.keys()) == {"status"}
+        if only_status:
+            if data["status"] == "已停课" and plan.status == "已通过":
+                plan.status = "已停课"
+                return success_response(message="课程已停课")
+            if data["status"] == "已通过" and plan.status == "已停课":
+                plan.status = "已通过"
+                return success_response(message="课程已恢复")
+            return error_response("无效的状态变更")
+
         if plan.status != "待审核":
             return error_response("仅可修改待审核状态的申请")
 

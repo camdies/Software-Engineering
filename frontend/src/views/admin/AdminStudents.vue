@@ -39,7 +39,9 @@
           <el-input v-model="form.student_id" :disabled="!!editing" />
         </el-form-item>
         <el-form-item label="姓名" required><el-input v-model="form.name" /></el-form-item>
-        <el-form-item label="年级"><el-input v-model="form.grade" placeholder="如 2024" /></el-form-item>
+        <el-form-item label="年级">
+          <el-input v-model="form.grade" placeholder="如 2024" maxlength="12" />
+        </el-form-item>
         <el-form-item label="专业"><el-input v-model="form.major" /></el-form-item>
         <el-form-item label="班级"><el-input v-model="form.class_name" /></el-form-item>
         <el-form-item label="邮箱"><el-input v-model="form.email" /></el-form-item>
@@ -93,6 +95,7 @@ function openDialog(row) {
 
 async function save() {
   if (!form.student_id || !form.name) { ElMessage.warning('学号和姓名必填'); return }
+  if (form.grade && isNaN(Number(form.grade))) { ElMessage.warning('年级请输入数字'); return }
   saving.value = true
   try {
     if (editing.value) {
