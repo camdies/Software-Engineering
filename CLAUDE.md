@@ -44,16 +44,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 三、常用命令（必须在项目根目录执行）
 
-### 环境准备
-
-```bash
-# 安装 Python 依赖
-pip install -r requirements.txt
-
-# 安装前端依赖 + 构建
-cd frontend && npm install && npm run build && cd ..
-```
-
 ### 启动应用
 
 ```bash
@@ -137,32 +127,7 @@ Blueprint (路由，只做参数提取+调用Controller)
 
 ---
 
-## 五、代码风格约定
-
-### 后端 (Python)
-
-- 文件编码 UTF-8（项目有 GBK 历史问题，新增文件务必 UTF-8）
-- 所有面向用户的错误消息用中文 `"操作成功"` / `"参数错误"`
-- 控制器方法返回字典，由 Blueprint 通过 `success_response()` / `error_response()` 包装
-- 敏感配置在 `backend/config/config.ini`（已 gitignore），模板在 `config.ini.example`
-- 操作日志通过 `backend/utils/log_util.py` 写入
-
-### 前端 (Vue/JS)
-
-- 用户界面全中文
-- 路由路径用英文（如 `/student/enroll`），页面标题用中文（如 "自主选课"）
-- 新增页面需在 `router/index.js` 注册路由 + 角色权限
-- 布局使用 `MainLayout.vue`，不要自建独立布局
-
-### 提交规范
-
-- 提交消息用中文，简洁描述变更内容
-- 示例: `修复选课控制部分时段问题`、`修复前端教师停课按钮逻辑`
-- 多个独立变更分多次提交，不要一个大提交包含不相关的修改
-
----
-
-## 六、数据库说明
+## 五、数据库说明
 
 ### 11张表
 
@@ -190,7 +155,7 @@ Blueprint (路由，只做参数提取+调用Controller)
 
 ---
 
-## 七、安全约束（绝对不要做的）
+## 六、安全约束（绝对不要做的）
 
 1. 不要在前端硬编码 JWT secret 或数据库密码
 2. 不要跳过 `@require_auth` 或 `@require_role` 装饰器
@@ -201,7 +166,7 @@ Blueprint (路由，只做参数提取+调用Controller)
 
 ---
 
-## 八、常见开发场景
+## 七、常见开发场景
 
 ### 新增一个 API 端点
 
@@ -249,7 +214,7 @@ Blueprint (路由，只做参数提取+调用Controller)
 
 ---
 
-## 十、测试约定
+## 八、测试约定
 
 所有测试使用 `unittest.TestCase` + `unittest.mock`，不使用 pytest 特有语法。
 
