@@ -94,6 +94,31 @@ function getCoursesAt(day, period) {
   )
 }
 
+function buildScheduleGrid() {
+  const grid = []
+  for (let p = 0; p < 11; p++) {
+    grid[p] = []
+    for (let d = 0; d < 7; d++) {
+      grid[p][d] = { courses: [], rowspan: 1, covered: false }
+    }
+  }
+
+  for (const c of myCourses.value) {
+    const startRow = c.period_start - 1
+    const endRow = startRow + c.period_count - 1
+    const col = c.weekday - 1
+
+    grid[startRow][col].courses.push(c)
+    grid[startRow][col].rowspan = c.period_count
+
+    for (let r = startRow + 1; r <= endRow; r++) {
+      grid[r][col].covered = true
+    }
+  }
+
+  return grid
+}
+
 function blockStyle(course) {
   const h = (course.period_count || 2) * 48
   const palette = [
@@ -124,14 +149,19 @@ async function exportExcel() {
       '14:30-15:10', '15:20-16:00', '16:10-16:50', '17:00-17:40',
       '19:00-19:40', '19:50-20:30', '20:40-21:20',
     ]
+    const grid = buildScheduleGrid()
     let h = '<html><head><meta charset="utf-8"><title>个人课表</title></head><body>'
     h += '<h2>个人课表</h2><table border="1" cellpadding="4" cellspacing="0">'
     h += '<tr><th>节次/时间</th>' + weekdayNames.map(w => `<th>${w}</th>`).join('') + '</tr>'
-    for (let p = 1; p <= 11; p++) {
-      h += `<tr><td>第${p}节<br/>${t[p - 1]}</td>`
-      for (let d = 1; d <= 7; d++) {
-        const cs = getCoursesAt(d, p)
-        h += `<td>${cs.map(c => `${c.course_name}<br/>${c.location || ''}<br/>${c.start_week}-${c.end_week}周`).join('<br/>') || ''}</td>`
+    for (let p = 0; p < 11; p++) {
+      h += `<tr><td>第${p + 1}节<br/>${t[p]}</td>`
+      for (let d = 0; d < 7; d++) {
+        const cell = grid[p][d]
+        if (cell.covered) continue
+        const cs = cell.courses
+        const rowspan = cell.rowspan
+        const rowspanAttr = rowspan > 1 ? ` rowspan="${rowspan}"` : ''
+        h += `<td${rowspanAttr}>${cs.map(c => `${c.course_name}<br/>${c.location || ''}<br/>${c.start_week}-${c.end_week}周`).join('<br/>') || ''}</td>`
       }
       h += '</tr>'
     }
@@ -147,6 +177,7 @@ function exportPDF() {
     '14:30-15:10', '15:20-16:00', '16:10-16:50', '17:00-17:40',
     '19:00-19:40', '19:50-20:30', '20:40-21:20',
   ]
+  const grid = buildScheduleGrid()
   const w = window.open('', '_blank')
   w.document.write(`
     <html><head><meta charset="utf-8"><title>个人课表</title>
@@ -156,7 +187,7 @@ function exportPDF() {
       h2 { text-align: center; margin-bottom: 8px; }
       .info { text-align: center; color: #666; font-size: 13px; margin-bottom: 16px; }
       table { width: 100%; border-collapse: collapse; font-size: 11px; }
-      th, td { border: 1px solid #333; padding: 6px; text-align: center; vertical-align: top; }
+      th, td { border: 1px solid #333; padding: 6px; text-align: center; vertical-align: middle; }
       th { background: #e8e8e8; font-weight: 600; }
       .time-col { width: 80px; }
       .has-course { background: #d4e6ff; font-weight: 500; }
@@ -165,12 +196,15 @@ function exportPDF() {
   w.document.write(`<div class="info">学期: ${semester.value} | 总课程: ${myCourses.value.length}门 | 总学分: ${totalCredits.value.toFixed(1)}</div>`)
   w.document.write('<table>')
   w.document.write(`<tr><th class="time-col">节次/时间</th>${weekdayNames.map(n => `<th>${n}</th>`).join('')}</tr>`)
-  for (let p = 1; p <= 11; p++) {
-    w.document.write(`<tr><td class="time-col">第${p}节<br/><small>${t[p - 1]}</small></td>`)
-    for (let d = 1; d <= 7; d++) {
-      const cs = getCoursesAt(d, p)
-      const cells = cs.map(c => `${c.course_name}<br/>${c.location || ''}`).join('<br/>') || ''
-      w.document.write(`<td class="${cs.length > 0 ? 'has-course' : ''}">${cells}</td>`)
+  for (let p = 0; p < 11; p++) {
+    w.document.write(`<tr><td class="time-col">第${p + 1}节<br/><small>${t[p]}</small></td>`)
+    for (let d = 0; d < 7; d++) {
+      const cell = grid[p][d]
+      if (cell.covered) continue
+      const cs = cell.courses
+      const rowspan = cell.rowspan
+      const rowspanAttr = rowspan > 1 ? ` rowspan="${rowspan}"` : ''
+      w.document.write(`<td${rowspanAttr} class="${cs.length > 0 ? 'has-course' : ''}">${cs.map(c => `${c.course_name}<br/>${c.location || ''}`).join('<br/>') || ''}</td>`)
     }
     w.document.write('</tr>')
   }

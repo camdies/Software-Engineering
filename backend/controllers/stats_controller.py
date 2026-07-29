@@ -278,11 +278,14 @@ class StatsController:
                 return export_to_excel(headers, rows, file_path,
                                        sheet_name="学业统计", summary_row=summary)
             elif "schedule" in stats_data:
-                # 课表导出
+                from backend.utils.export_util import export_schedule_to_excel
+
                 headers = ["节次", "时间", "周一", "周二", "周三", "周四", "周五", "周六", "周日"]
                 rows = stats_data["schedule"]
-                return export_to_excel(headers, rows, file_path,
-                                       sheet_name="个人课表")
+                merge_ranges = stats_data.get("merge_ranges", [])
+                return export_schedule_to_excel(
+                    headers, rows, merge_ranges, file_path,
+                    sheet_name="个人课表")
             else:
                 logger.warning("stats_data格式不支持Excel导出")
                 return False
@@ -292,45 +295,71 @@ class StatsController:
             return False
 
     def get_schedule_data(self, student_id: str) -> dict:
-        """获取学生课表数据（用于导出）。
+        """获取学生课表数据（含rowspan信息用于导出）。
 
         Args:
             student_id: 学生学号。
 
         Returns:
-            dict: 包含schedule二维数组的字典。
+            dict: 包含schedule二维数组和merge_ranges的字典。
         """
         try:
             from backend.controllers.student_controller import StudentController
             sc = StudentController()
             my_courses = sc.get_my_courses(student_id)
 
-            weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
             period_times = [
                 "08:30-09:10", "09:20-10:00", "10:20-11:00", "11:10-11:50",
                 "14:30-15:10", "15:20-16:00", "16:10-16:50", "17:00-17:40",
                 "19:00-19:40", "19:50-20:30", "20:40-21:20",
             ]
 
+            grid = []
+            for p in range(11):
+                row = []
+                for d in range(7):
+                    row.append({"text": "", "rowspan": 1, "covered": False})
+                grid.append(row)
+
+            for c in my_courses:
+                start_row = c["period_start"] - 1
+                end_row = start_row + c["period_count"] - 1
+                col = c["weekday"] - 1
+
+                name = c.get("course_name", "")
+                loc = c.get("location", "")
+                display_text = f"{name}\n{loc}" if loc else name
+
+                grid[start_row][col]["text"] = display_text
+                grid[start_row][col]["rowspan"] = c["period_count"]
+
+                for r in range(start_row + 1, end_row + 1):
+                    grid[r][col]["covered"] = True
+
             schedule = []
-            for p in range(1, 12):
-                row = [f"第{p}节", period_times[p - 1]]
-                for d in range(1, 8):
-                    cell = ""
-                    for c in my_courses:
-                        if (c["weekday"] == d
-                            and c["period_start"] <= p
-                            and c["period_start"] + c["period_count"] - 1 >= p):
-                            cell = c.get("course_name", "")
-                            break
-                    row.append(cell)
+            merge_ranges = []
+
+            for p in range(11):
+                row = [f"第{p + 1}节", period_times[p]]
+                for d in range(7):
+                    cell = grid[p][d]
+                    if cell["covered"]:
+                        row.append("")
+                    else:
+                        row.append(cell["text"])
+                        if cell["rowspan"] > 1:
+                            col_letter = chr(ord("C") + d)
+                            merge_ranges.append(
+                                f"{col_letter}{p + 3}:"
+                                f"{col_letter}{p + 2 + cell['rowspan']}"
+                            )
                 schedule.append(row)
 
-            return {"schedule": schedule}
+            return {"schedule": schedule, "merge_ranges": merge_ranges}
 
         except Exception as e:
             logger.error(f"获取课表数据异常: {e}", exc_info=True)
-            return {"schedule": []}
+            return {"schedule": [], "merge_ranges": []}
 
     def get_gpa_trend(self, student_id: str) -> dict:
         try:
