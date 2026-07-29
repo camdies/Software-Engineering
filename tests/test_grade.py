@@ -8,15 +8,36 @@ from unittest.mock import patch, MagicMock
 
 class TestGrade(unittest.TestCase):
     def setUp(self):
+        # get_logger() calls Settings.get_instance() at import time;
+        # patch it at the source before any grade_controller import.
+        self.patcher_config = patch("backend.config.settings.Settings")
+        self.mock_settings = self.patcher_config.start()
+        ms = MagicMock()
+        ms.log_level = "ERROR"
+        ms.log_dir = "logs"
+        self.mock_settings.get_instance.return_value = ms
+
         self.patcher_db = patch("backend.controllers.grade_controller.DatabaseManager")
         self.mock_db_cls = self.patcher_db.start()
         self.mock_db = MagicMock()
         self.mock_db_cls.get_instance.return_value = self.mock_db
+
+        # Mock the ORM classes that record_grade / audit_grade construct,
+        # so that SQLAlchemy mapper configuration never runs without a
+        # real engine and fully-loaded model registry.
+        self.patcher_grade = patch("backend.controllers.grade_controller.Grade")
+        self.patcher_grade.start()
+        self.patcher_ol = patch("backend.controllers.grade_controller.OperationLog")
+        self.patcher_ol.start()
+
         self.patcher_log = patch("backend.controllers.grade_controller.logger")
         self.patcher_log.start()
 
     def tearDown(self):
+        self.patcher_config.stop()
         self.patcher_db.stop()
+        self.patcher_grade.stop()
+        self.patcher_ol.stop()
         self.patcher_log.stop()
 
     def _mock_session(self, session_mock):
@@ -42,7 +63,12 @@ class TestGrade(unittest.TestCase):
     def test_record_grade_boundary(self):
         from backend.controllers.grade_controller import GradeController
         session_mock = MagicMock(); self._mock_session(session_mock)
-        session_mock.query.return_value.filter_by.return_value.first.side_effect = [MagicMock(), None]
+        # first() returns [enrollment_mock, None] per score iteration
+        session_mock.query.return_value.filter_by.return_value.first.side_effect = [
+            MagicMock(), None,  # score=0
+            MagicMock(), None,  # score=60
+            MagicMock(), None,  # score=100
+        ]
         ctrl = GradeController()
         for s in [0, 60, 100]:
             with self.subTest(score=s):
@@ -71,6 +97,7 @@ class TestGrade(unittest.TestCase):
         session_mock = MagicMock(); self._mock_session(session_mock)
         grade_mock = MagicMock()
         grade_mock.status = "待审核"; grade_mock.score = 75
+        grade_mock.new_score = 85
         grade_mock.modify_reason = "申请修改为85: 录入错误"
         session_mock.query.return_value.filter_by.return_value.first.return_value = grade_mock
         result = GradeController().audit_grade("ADMIN", 1, "approve", "核实无误")
