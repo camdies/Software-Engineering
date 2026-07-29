@@ -1,3 +1,9 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+---
+
 # CLAUDE.md — 高校教务管理系统
 
 > SCNU 软件工程小组 v3.0 · Claude 协作开发指引
@@ -15,6 +21,8 @@
 - **详细架构**: 见 [ARCHITECTURE.md](ARCHITECTURE.md)（124文件、48 API端点、11张表）
 - **API 文档**: 见 [API.md](API.md)
 - **调试指南**: 见 [DEBUG.md](DEBUG.md)
+- **前端运行时**: 见 [FRONTEND_GUIDE.md](FRONTEND_GUIDE.md)
+- **开发介绍**: 见 [DEVELOPMENT.md](DEVELOPMENT.md)
 
 ---
 
@@ -22,12 +30,15 @@
 
 | 层级 | 技术 | 备注 |
 |------|------|------|
-| 前端 | Vue 3 (Composition API) + Element Plus + Vite | SPA，构建产物在 `frontend/dist/` |
+| 前端 | Vue 3 (Composition API) + Element Plus + ECharts + Vite | SPA，构建产物在 `frontend/dist/` |
 | 后端 | Flask + JWT (HS256, 24h) | `run.py` 入口，工厂模式 |
 | ORM | SQLAlchemy + PyMySQL | 双数据库支持 (MySQL / SQL Server) |
-| 数据库 | MySQL 8.0+ (默认) | 便携版在 `mysql-portable/` |
+| 数据库 | MySQL 8.0+ (默认) | 便携版在 `mysql-portable/`，嵌入式 Python 在 `python-embed/` |
+| Excel | openpyxl（生成）+ pandas（统计） | 成绩批量导入、统计导出、课表导出 |
+| PDF | reportlab | 仅课表 PDF 导出（学生端） |
 | 测试 | pytest | `tests/` 目录 |
 | 构建 | npm (Node 18+) | Vite 构建到 `frontend/dist/` |
+| 分发 | NSIS 安装包 | `develop tool/setup.nsi` → `EduMgmt-Setup-3.0.0.exe` |
 
 ---
 
@@ -218,38 +229,34 @@ Blueprint (路由，只做参数提取+调用Controller)
 2. 前端在 `views/student/StudentEnroll.vue`（最复杂的页面，~600行）
 3. 测试在 `tests/test_enrollment.py`（含并发测试）
 
+### Excel/PDF 导出
+
+- **Excel 导出基础**: `backend/utils/export_util.py`（`export_to_excel` 通用函数）
+- **课表 Excel 导出**: 使用 `export_schedule_to_excel`，数据由 `stats_controller.get_schedule_data` 提供（含 `merge_ranges` 用于 rowspan 合并）
+- **PDF 导出**: 仅学生端课表，前端 `StudentSchedule.vue` 通过 `buildScheduleGrid()` 构建 rowspan 网格 → `window.print()`
+- **Excel 批量导入**: `grade_controller.batch_record_grade` 使用 openpyxl 读取
+
 ### 调试
 
-- 后端日志在 `logs/` 目录，使用 TimedRotatingFileHandler
+- 后端日志在 `logs/` 目录，使用 `RotatingFileHandler`（10MB 切割、保留 30 个文件）
 - PyCharm 调试配置: Script path=`run.py`, Working directory=`<项目根目录>`
 - 前端: `npm run dev` 启动 Vite 热更新，API 代理到 `:5000`
 - 详见 [DEBUG.md](DEBUG.md)
 
----
+### 标签页切换数据不刷新
 
-## 九、构建产物（不要手动编辑）
-
-以下由工具自动生成，已加入 `.gitignore`，拉取后重新构建:
-
-| 产物 | 生成方式 |
-|------|----------|
-| `frontend/dist/` | `cd frontend && npm run build` |
-| `frontend/node_modules/` | `cd frontend && npm install` |
-| `mysql-portable/data/` | `start_all.bat` 自动初始化 |
-| `backend/config/config.ini` | 从 `.example` 复制 + 手动配置 |
-| `logs/` | 运行时自动创建 |
-| `__pycache__/`, `*.pyc` | Python 自动生成 |
+学生端 "选课" 和 "个人课表" 等页签切换时，Vue Router 复用组件不会重新触发 `onMounted`。已在 `StudentSchedule.vue` 中通过 `watch(() => route.path, ...)` 解决。新增页面时注意同样的问题。
 
 ---
 
-## 十、默认测试账号
+## 十、测试约定
 
-所有账号密码均为 **123456**。
+所有测试使用 `unittest.TestCase` + `unittest.mock`，不使用 pytest 特有语法。
 
-| 角色 | 账号 |
-|------|------|
-| 管理员 | admin / admin2 |
-| 教师 | T001 ~ T008（多学院） |
-| 学生 | STU001 ~ STU025（多专业/年级） |
-
-完整列表见 [README.md](README.md) 默认账号章节。
+**Mock 架构要点**（新增或修改测试时务必遵守）：
+1. `Settings` 必须在 **源定义位置** `backend.config.settings.Settings` 处 mock（不能 mock `enrollment_controller.Settings`，因为 Settings 已改为方法内延迟导入）
+2. Mock `Settings` 时必须提供 `log_level="ERROR"` + `log_dir="logs"`，否则 `get_logger()` 在模块导入时崩溃
+3. `Grade`, `Enrollment`, `OperationLog` 等 ORM 类必须在对应 controller 模块中 mock，防止 `__init__` 触发 SQLAlchemy mapper 配置
+4. `_check_enrollment_period` 通过 `patch.object` 直接 mock，因为其内部有局部 DatabaseManager 导入，不经过模块级 mock
+5. `session.query.return_value.filter_by.return_value.first` 用于 mock `query().filter_by().first()` 链；`session.query.return_value.filter.return_value.join.return_value.filter.return_value.first/all` 用于 mock `query().filter().join().filter()` 链（两者是不同的调用路径）
+6. 并发测试中每个线程需独立创建 session mock，通过 `self._mock_session()` 复用 setUp 的 DatabaseManager mock
