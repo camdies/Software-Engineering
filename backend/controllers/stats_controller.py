@@ -350,8 +350,8 @@ class StatsController:
                         if cell["rowspan"] > 1:
                             col_letter = chr(ord("C") + d)
                             merge_ranges.append(
-                                f"{col_letter}{p + 3}:"
-                                f"{col_letter}{p + 2 + cell['rowspan']}"
+                                f"{col_letter}{p + 2}:"
+                                f"{col_letter}{p + 1 + cell['rowspan']}"
                             )
                 schedule.append(row)
 

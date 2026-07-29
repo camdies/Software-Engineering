@@ -150,6 +150,16 @@ def export_schedule_to_excel(
         for merge_range in merge_ranges:
             ws.merge_cells(merge_range)
 
+        # Re-apply styles after merge (merge_cells strips formatting from
+        # non-top-left cells in the merged range).
+        for row_idx, row_data in enumerate(data_rows, 2):
+            for col_idx, value in enumerate(row_data, 1):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.alignment = CELL_ALIGNMENT
+                cell.border = THIN_BORDER
+                if row_idx % 2 == 0 and cell.value:
+                    cell.fill = EVEN_ROW_FILL
+
         for col_idx in range(1, len(headers) + 1):
             max_width = 0
             for row in ws.iter_rows(min_col=col_idx, max_col=col_idx):

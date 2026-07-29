@@ -62,9 +62,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
+
+const route = useRoute()
 
 const weekdayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 const periodTimes = [
@@ -79,13 +82,18 @@ const totalCredits = computed(() => {
   return myCourses.value.reduce((sum, c) => sum + (parseFloat(c.credit) || 0), 0)
 })
 
-onMounted(async () => {
+async function loadCourses() {
   const res = await request.get('/student/my-courses')
   myCourses.value = res.data?.items || []
   if (myCourses.value.length > 0) {
     semester.value = myCourses.value[0].semester || ''
   }
-})
+}
+
+onMounted(loadCourses)
+
+// Watch route so data refreshes when navigating from e.g. /student/enroll
+watch(() => route.path, () => { if (route.path === '/student/my-courses') loadCourses() })
 
 function getCoursesAt(day, period) {
   return myCourses.value.filter(c =>
