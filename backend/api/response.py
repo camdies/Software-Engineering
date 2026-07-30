@@ -33,35 +33,3 @@ def error_response(message="操作失败", data=None, status_code=400):
         Flask Response
     """
     return jsonify({"success": False, "data": data, "message": message}), status_code
-
-
-def wrap_controller_result(result):
-    """将现有 Controller 方法返回的 dict/list 包装为统一响应。
-
-    适配策略：
-    - 如果 result 包含 'success' 键 → 透传（已是标准格式）
-    - 如果 result 包含 'total' 键 → 分页数据，包进 data
-    - 如果 result 是 list → 包进 {"items": result}
-    - 否则 → 整个 result 作为 data
-
-    Args:
-        result: 现有 Controller 方法的返回值。
-
-    Returns:
-        (dict, int): (响应体, HTTP状态码)
-    """
-    if isinstance(result, dict):
-        if "success" in result:
-            is_ok = result.get("success", False)
-            return (
-                {"success": is_ok, "data": result, "message": result.get("message", "")},
-                200 if is_ok else 400,
-            )
-        if "total" in result:
-            return ({"success": True, "data": result, "message": "查询成功"}, 200)
-        return ({"success": True, "data": result, "message": "操作成功"}, 200)
-
-    if isinstance(result, list):
-        return ({"success": True, "data": {"items": result}, "message": "查询成功"}, 200)
-
-    return ({"success": True, "data": result, "message": "操作成功"}, 200)

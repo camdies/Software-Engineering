@@ -135,3 +135,8 @@ class Settings:
     @property
     def jwt_expiration_hours(self) -> int:
         return self._config.getint("web", "jwt_expiration_hours", fallback=24)
+
+    @property
+    def default_password(self) -> str:
+        val = self._config.get("system", "default_password", fallback="123456").strip()
+        return val if val else "123456"

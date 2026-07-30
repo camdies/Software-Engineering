@@ -50,7 +50,7 @@
 |------|------|------|
 | `app_factory.py` | 4.1 KB | Flask 应用工厂: CORS、蓝图注册、静态文件服务、延迟数据库初始化 |
 | `auth.py` | 4.4 KB | JWT 创建/解码、`@require_auth` / `@require_role` 装饰器 |
-| `response.py` | 2.3 KB | `success_response()` / `error_response()` / `wrap_controller_result()` |
+| `response.py` | 2.3 KB | `success_response()` / `error_response()` |
 
 ### 2.2 蓝图路由 (`backend/api/blueprints/`) — 48 个端点
 

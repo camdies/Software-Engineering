@@ -15,6 +15,7 @@ from backend.models.teacher import Teacher
 from backend.models.course import Course
 from backend.models.course_plan import CoursePlan
 from backend.models.operation_log import OperationLog
+from backend.config.settings import Settings
 from backend.utils.log_util import get_logger
 
 logger = get_logger("admin_controller")
@@ -86,14 +87,15 @@ class AdminController:
     def create_student(self, student_id: str, name: str,
                        major: str = None, class_name: str = None,
                        contact: str = None, email: str = None,
-                       grade: str = None, password: str = None) -> dict:
+                       grade: str = None, password: str = None,
+                       admin_id: str = None) -> dict:
         """创建学生信息。
 
         同时在user_account表中创建对应账号（默认密码123456或由管理员指定）。
         """
         try:
             from backend.utils.auth_util import hash_password
-            pwd = password if password and len(password) >= 6 else "123456"
+            pwd = password if password and len(password) >= 6 else Settings.get_instance().default_password
             with self._db.get_session() as session:
                 existing = session.query(UserAccount).filter_by(
                     user_id=student_id).first()
@@ -120,7 +122,7 @@ class AdminController:
                 )
                 session.add(student)
 
-                self._write_log(session, "admin", "系统",
+                self._write_log(session, admin_id, "系统",
                                 f"创建学生: {student_id} (默认密码: {pwd})", "成功", "")
                 logger.info(f"创建学生: {student_id}")
                 return {"success": True, "message": f"学生创建成功，默认密码: {pwd}"}
@@ -140,14 +142,14 @@ class AdminController:
                 for key, value in kwargs.items():
                     if hasattr(student, key) and key != "student_id":
                         setattr(student, key, value)
-                self._write_log(session, "admin", "系统",
+                self._write_log(session, kwargs.get("admin_id"), "系统",
                                 f"更新学生: {student_id}", "成功", "")
                 return {"success": True, "message": "学生信息更新成功"}
         except Exception as e:
             logger.error(f"更新学生异常: {e}", exc_info=True)
             return {"success": False, "message": "操作失败，请重试"}
 
-    def delete_student(self, student_id: str) -> dict:
+    def delete_student(self, student_id: str, admin_id: str = None) -> dict:
         """删除学生及其所有关联数据。"""
         try:
             from backend.models.enrollment import Enrollment
@@ -173,7 +175,7 @@ class AdminController:
                 if account:
                     session.delete(account)
 
-                self._write_log(session, "admin", "系统",
+                self._write_log(session, admin_id, "系统",
                                 f"删除学生: {student_id}", "成功", "")
                 return {"success": True, "message": "学生删除成功"}
         except Exception as e:
@@ -183,6 +185,12 @@ class AdminController:
     def _write_log(self, session, user_id: str, log_type: str,
                    operation: str, result: str, ip_address: str = ""
                    ) -> None:
+        # 漏传 admin_id 检测 + 兜底
+        if user_id is None:
+            import inspect
+            caller = inspect.currentframe().f_back.f_code.co_name
+            logger.warning(f"admin_id 未传入 {caller}()，fallback 为 'admin'")
+            user_id = "admin"
         savepoint = session.begin_nested()
         try:
             log_entry = OperationLog(
@@ -244,14 +252,14 @@ class AdminController:
     def create_teacher(self, teacher_id: str, name: str,
                        college: str = None, title: str = None,
                        contact: str = None, email: str = None,
-                       password: str = None) -> dict:
+                       password: str = None, admin_id: str = None) -> dict:
         """创建教师信息。
 
         同时在user_account表中创建对应账号（默认密码123456或由管理员指定）。
         """
         try:
             from backend.utils.auth_util import hash_password
-            pwd = password if password and len(password) >= 6 else "123456"
+            pwd = password if password and len(password) >= 6 else Settings.get_instance().default_password
             with self._db.get_session() as session:
                 existing = session.query(UserAccount).filter_by(
                     user_id=teacher_id).first()
@@ -274,7 +282,7 @@ class AdminController:
                     contact=contact,
                 )
                 session.add(teacher)
-                self._write_log(session, "admin", "系统",
+                self._write_log(session, admin_id, "系统",
                                 f"创建教师: {teacher_id} (默认密码: {pwd})", "成功", "")
                 logger.info(f"创建教师: {teacher_id}")
                 return {"success": True, "message": f"教师创建成功，默认密码: {pwd}"}
@@ -282,7 +290,7 @@ class AdminController:
             logger.error(f"创建教师异常: {e}", exc_info=True)
             return {"success": False, "message": "操作失败，请重试"}
 
-    def delete_teacher(self, teacher_id: str) -> dict:
+    def delete_teacher(self, teacher_id: str, admin_id: str = None) -> dict:
         """删除教师及其所有关联数据。"""
         try:
             from backend.models.enrollment import Enrollment
@@ -312,7 +320,7 @@ class AdminController:
                 if account:
                     session.delete(account)
 
-                self._write_log(session, "admin", "系统",
+                self._write_log(session, admin_id, "系统",
                                 f"删除教师: {teacher_id}", "成功", "")
                 return {"success": True, "message": "教师删除成功"}
         except Exception as e:
@@ -330,7 +338,7 @@ class AdminController:
                 for key, value in kwargs.items():
                     if hasattr(teacher, key) and key != "teacher_id":
                         setattr(teacher, key, value)
-                self._write_log(session, "admin", "系统",
+                self._write_log(session, kwargs.get("admin_id"), "系统",
                                 f"更新教师: {teacher_id}", "成功", "")
                 return {"success": True, "message": "教师信息更新成功"}
         except Exception as e:
@@ -380,7 +388,8 @@ class AdminController:
                       exam_type: str = None, department: str = None,
                       course_type: str = None, target_major: str = None,
                       description: str = None, textbook: str = None,
-                      syllabus: str = None, instructor_intro: str = None) -> dict:
+                      syllabus: str = None, instructor_intro: str = None,
+                      admin_id: str = None) -> dict:
         """创建课程信息。"""
         try:
             with self._db.get_session() as session:
@@ -403,7 +412,7 @@ class AdminController:
                     instructor_intro=instructor_intro,
                 )
                 session.add(course)
-                self._write_log(session, "admin", "系统",
+                self._write_log(session, admin_id, "系统",
                                 f"创建课程: {course_id}", "成功", "")
                 logger.info(f"创建课程: {course_id}")
                 return {"success": True, "message": "课程创建成功"}
@@ -422,14 +431,14 @@ class AdminController:
                 for key, value in kwargs.items():
                     if hasattr(course, key) and key != "course_id":
                         setattr(course, key, value)
-                self._write_log(session, "admin", "系统",
+                self._write_log(session, kwargs.get("admin_id"), "系统",
                                 f"更新课程: {course_id}", "成功", "")
                 return {"success": True, "message": "课程信息更新成功"}
         except Exception as e:
             logger.error(f"更新课程异常: {e}", exc_info=True)
             return {"success": False, "message": "操作失败，请重试"}
 
-    def delete_course(self, course_id: str) -> dict:
+    def delete_course(self, course_id: str, admin_id: str = None) -> dict:
         """删除课程及其关联开课计划。"""
         try:
             with self._db.get_session() as session:
@@ -446,7 +455,7 @@ class AdminController:
                     session.delete(plan)
                 session.flush()
                 session.delete(course)
-                self._write_log(session, "admin", "系统",
+                self._write_log(session, admin_id, "系统",
                                 f"删除课程: {course_id}", "成功", "")
                 return {"success": True, "message": "课程删除成功"}
         except Exception as e:
@@ -479,7 +488,8 @@ class AdminController:
                                is_current: bool = False,
                                enrollment_open: bool = False,
                                enroll_start: str = None,
-                               enroll_end: str = None) -> dict:
+                               enroll_end: str = None,
+                               admin_id: str = None) -> dict:
         """创建学期配置记录。
 
         Args:
@@ -511,7 +521,7 @@ class AdminController:
                 if is_current:
                     session.query(SemesterConfig).update({"is_current": 0})
                 session.add(config)
-                self._write_log(session, "admin", "系统",
+                self._write_log(session, admin_id, "系统",
                                 f"创建学期配置: {semester}", "成功", "")
                 return {"success": True, "message": "学期配置创建成功",
                         "data": config.to_dict()}
@@ -558,7 +568,7 @@ class AdminController:
                     val = kwargs["enroll_end"]
                     config.enroll_end = _parse_datetime(val, "%Y-%m-%d %H:%M:%S")
 
-                self._write_log(session, "admin", "系统",
+                self._write_log(session, kwargs.get("admin_id"), "系统",
                                 f"更新学期配置: {config.semester}", "成功", "")
                 return {"success": True, "message": "学期配置更新成功",
                         "data": config.to_dict()}
@@ -566,7 +576,7 @@ class AdminController:
             logger.error(f"更新学期配置异常: {e}", exc_info=True)
             return {"success": False, "message": str(e)}
 
-    def delete_semester_config(self, config_id: int) -> dict:
+    def delete_semester_config(self, config_id: int, admin_id: str = None) -> dict:
         """删除学期配置记录。"""
         try:
             from backend.models.semester_config import SemesterConfig
@@ -577,7 +587,7 @@ class AdminController:
                 if config is None:
                     return {"success": False, "message": "记录不存在"}
                 session.delete(config)
-                self._write_log(session, "admin", "系统",
+                self._write_log(session, admin_id, "系统",
                                 f"删除学期配置: {config.semester}", "成功", "")
                 return {"success": True, "message": "学期配置删除成功"}
         except Exception as e:

@@ -24,6 +24,8 @@ from backend.api.blueprints.audit_bp import audit_bp
 from backend.api.blueprints.password_reset_bp import password_reset_bp
 from backend.api.response import error_response
 
+_WARNED_DEFAULT_PASSWORD = False
+
 
 def create_app() -> Flask:
     """创建并配置 Flask 应用。
@@ -71,6 +73,27 @@ def create_app() -> Flask:
 
     # ── 生产模式：服务 Vue 前端静态文件 ──
     _setup_static_serving(app)
+
+    # ── 启动安全检查 ──
+    global _WARNED_DEFAULT_PASSWORD
+    if not _WARNED_DEFAULT_PASSWORD:
+        _WARNED_DEFAULT_PASSWORD = True
+        from backend.config.settings import Settings
+        raw = Settings.get_instance()._config.get(
+            "system", "default_password", fallback="123456"
+        ).strip()
+        from backend.utils.log_util import get_logger
+        _startup_log = get_logger("app_factory")
+        if raw == "123456":
+            _startup_log.warning(
+                "⚠ 安全警告：默认密码仍为弱口令 '123456'，"
+                "请修改 backend/config/config.ini 中 [system] default_password"
+            )
+        if raw == "":
+            _startup_log.warning(
+                "⚠ 安全警告：default_password 为空字符串（极度危险），"
+                "运行时已兜底为 '123456'。请修改 backend/config/config.ini"
+            )
 
     # ── 初始化数据库（延迟到首次请求）──
     # 仅初始化连接，不做 create_all_tables —

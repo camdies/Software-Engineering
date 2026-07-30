@@ -22,6 +22,7 @@ from backend.models.teacher import Teacher
 from backend.models.grade import Grade
 from backend.models.operation_log import OperationLog
 from backend.utils.auth_util import hash_password
+from backend.config.settings import Settings
 
 audit_bp = Blueprint("audit", __name__, url_prefix="/api/audit")
 
@@ -87,7 +88,7 @@ def handle_password_reset(request_id):
                 if reset_req.new_password:
                     user.password_hash = reset_req.new_password
                 else:
-                    user.password_hash = hash_password("123456")
+                    user.password_hash = hash_password(Settings.get_instance().default_password)
                 user.is_locked = 0
                 user.login_fail_count = 0
             reset_req.status = "已通过"

@@ -69,6 +69,7 @@ def create_student():
         email=data.get("email"),
         grade=data.get("grade"),
         password=data.get("password"),
+        admin_id=g.current_user["user_id"],
     )
     if result.get("success"):
         return success_response(message=result["message"])
@@ -81,7 +82,8 @@ def create_student():
 def update_student(student_id):
     data = request.get_json(silent=True) or {}
     data.pop("student_id", None)
-    result = AdminController().update_student(student_id, **data)
+    result = AdminController().update_student(student_id,
+        admin_id=g.current_user["user_id"], **data)
     if result.get("success"):
         return success_response(message=result["message"])
     return error_response(result.get("message", "更新失败"))
@@ -91,7 +93,8 @@ def update_student(student_id):
 @require_auth
 @require_role("admin")
 def delete_student(student_id):
-    result = AdminController().delete_student(student_id)
+    result = AdminController().delete_student(student_id,
+        admin_id=g.current_user["user_id"])
     if result.get("success"):
         return success_response(message=result["message"])
     return error_response(result.get("message", "删除失败"))
@@ -128,6 +131,7 @@ def create_teacher():
         contact=data.get("contact"),
         email=data.get("email"),
         password=data.get("password"),
+        admin_id=g.current_user["user_id"],
     )
     if result.get("success"):
         return success_response(message=result["message"])
@@ -140,7 +144,8 @@ def create_teacher():
 def update_teacher(teacher_id):
     data = request.get_json(silent=True) or {}
     data.pop("teacher_id", None)
-    result = AdminController().update_teacher(teacher_id, **data)
+    result = AdminController().update_teacher(teacher_id,
+        admin_id=g.current_user["user_id"], **data)
     if result.get("success"):
         return success_response(message=result["message"])
     return error_response(result.get("message", "更新失败"))
@@ -150,7 +155,8 @@ def update_teacher(teacher_id):
 @require_auth
 @require_role("admin")
 def delete_teacher(teacher_id):
-    result = AdminController().delete_teacher(teacher_id)
+    result = AdminController().delete_teacher(teacher_id,
+        admin_id=g.current_user["user_id"])
     if result.get("success"):
         return success_response(message=result["message"])
     return error_response(result.get("message", "删除失败"))
@@ -191,6 +197,7 @@ def create_course():
         textbook=data.get("textbook"),
         syllabus=data.get("syllabus"),
         instructor_intro=data.get("instructor_intro"),
+        admin_id=g.current_user["user_id"],
     )
     if result.get("success"):
         return success_response(message=result["message"])
@@ -203,7 +210,8 @@ def create_course():
 def update_course(course_id):
     data = request.get_json(silent=True) or {}
     data.pop("course_id", None)
-    result = AdminController().update_course(course_id, **data)
+    result = AdminController().update_course(course_id,
+        admin_id=g.current_user["user_id"], **data)
     if result.get("success"):
         return success_response(message=result["message"])
     return error_response(result.get("message", "更新失败"))
@@ -213,7 +221,8 @@ def update_course(course_id):
 @require_auth
 @require_role("admin")
 def delete_course(course_id):
-    result = AdminController().delete_course(course_id)
+    result = AdminController().delete_course(course_id,
+        admin_id=g.current_user["user_id"])
     if result.get("success"):
         return success_response(message=result["message"])
     return error_response(result.get("message", "删除失败"))
@@ -267,6 +276,7 @@ def create_semester_config():
         enrollment_open=data.get("enrollment_open", False),
         enroll_start=data.get("enroll_start"),
         enroll_end=data.get("enroll_end"),
+        admin_id=g.current_user["user_id"],
     )
     if result.get("success"):
         return success_response(message=result["message"],
@@ -279,7 +289,8 @@ def create_semester_config():
 @require_role("admin")
 def update_semester_config(config_id):
     data = request.get_json(silent=True) or {}
-    result = AdminController().update_semester_config(config_id, **data)
+    result = AdminController().update_semester_config(config_id,
+        admin_id=g.current_user["user_id"], **data)
     if result.get("success"):
         return success_response(message=result["message"],
                                 data=result.get("data"))
@@ -290,7 +301,8 @@ def update_semester_config(config_id):
 @require_auth
 @require_role("admin")
 def delete_semester_config(config_id):
-    result = AdminController().delete_semester_config(config_id)
+    result = AdminController().delete_semester_config(config_id,
+        admin_id=g.current_user["user_id"])
     if result.get("success"):
         return success_response(message=result["message"])
     return error_response(result.get("message", "删除失败"))

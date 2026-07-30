@@ -8,27 +8,6 @@ validator.py - 输入数据校验工具
 import re
 
 
-def validate_student_id(student_id: str) -> tuple:
-    """校验学号格式。
-
-    规则: 非空，长度6-20位，由字母数字组成。
-
-    Args:
-        student_id: 待校验的学号字符串。
-
-    Returns:
-        tuple: (是否合法, 错误原因)
-    """
-    if not student_id or not student_id.strip():
-        return False, "学号不能为空"
-    student_id = student_id.strip()
-    if len(student_id) < 6 or len(student_id) > 20:
-        return False, "学号长度应为6-20位"
-    if not re.match(r'^[A-Za-z0-9]+$', student_id):
-        return False, "学号只能包含字母和数字"
-    return True, ""
-
-
 def validate_score(score) -> tuple:
     """校验成绩是否在0-100的整数范围内。
 

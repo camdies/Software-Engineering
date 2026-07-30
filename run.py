@@ -28,6 +28,8 @@ if __name__ == "__main__":
                         help='Listen on 0.0.0.0 (LAN accessible)')
     parser.add_argument('--port', type=int, default=5000,
                         help='Port (default 5000)')
+    parser.add_argument('--debug', action='store_true',
+                        help='启用 Flask debug 模式（热重载）')
     args = parser.parse_args()
 
     host = '0.0.0.0' if args.public else '127.0.0.1'
@@ -44,6 +46,6 @@ if __name__ == "__main__":
     app.run(
         host=host,
         port=args.port,
-        debug=True,
+        debug=args.debug,
         threaded=True,
     )

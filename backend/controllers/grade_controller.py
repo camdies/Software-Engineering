@@ -407,34 +407,6 @@ class GradeController:
             logger.error(f"成绩审核异常: {e}", exc_info=True)
             return {"success": False, "message": "操作失败，请重试"}
 
-    def _extract_new_score(self, modify_reason: str) -> int:
-        """从修改原因字符串中提取新成绩值。
-
-        搜索模式: '申请修改为{score}' 或直接的数字。
-
-        Args:
-            modify_reason: 修改原因字符串。
-
-        Returns:
-            int: 新成绩值，解析失败返回None。
-        """
-        import re
-
-        if not modify_reason:
-            return None
-        match = re.search(r'修改为(\d+)', modify_reason)
-        if match:
-            score = int(match.group(1))
-            if 0 <= score <= 100:
-                return score
-        # 尝试查找任意数字
-        numbers = re.findall(r'\d+', modify_reason)
-        for num_str in numbers:
-            score = int(num_str)
-            if 0 <= score <= 100:
-                return score
-        return None
-
     def _write_log(self, session, user_id: str, log_type: str,
                    operation: str, result: str, ip_address: str = ""
                    ) -> None:

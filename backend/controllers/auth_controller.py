@@ -258,7 +258,7 @@ class AuthController:
             dict: {'success': bool, 'message': str}
         """
         try:
-            default_pwd = "123456"
+            default_pwd = Settings.get_instance().default_password
             with self._db.get_session() as session:
                 user = session.query(UserAccount).filter_by(
                     user_id=user_id
