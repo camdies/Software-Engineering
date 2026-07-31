@@ -61,12 +61,15 @@ CREATE TABLE semester_config (
     start_date      DATE          NULL,
     end_date        DATE          NULL,
     is_current      TINYINT       NOT NULL DEFAULT 0,
+    current_guard   TINYINT       GENERATED ALWAYS AS
+                    (CASE WHEN is_current = 1 THEN 1 ELSE NULL END) STORED,
     enrollment_open TINYINT       NOT NULL DEFAULT 0,
     enroll_start    DATETIME      NULL,
     enroll_end      DATETIME      NULL,
     created_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (config_id),
-    CONSTRAINT CK_semester_total_weeks CHECK (total_weeks BETWEEN 1 AND 30)
+    CONSTRAINT CK_semester_total_weeks CHECK (total_weeks BETWEEN 1 AND 30),
+    CONSTRAINT UQ_semester_single_current UNIQUE (current_guard)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 多学期配置: 当前学期选课开放，历史学期用于查询
@@ -85,6 +88,7 @@ CREATE TABLE user_account (
     last_login      DATETIME       NULL,
     is_locked       TINYINT        NOT NULL DEFAULT 0,
     login_fail_count INT           NOT NULL DEFAULT 0,
+    token_version   INT            NOT NULL DEFAULT 0,
     created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id),
     CONSTRAINT CK_user_account_role CHECK (role IN ('admin','teacher','student'))
@@ -239,9 +243,14 @@ CREATE TABLE operation_log (
     result      VARCHAR(10)    NOT NULL,
     log_time    DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ip_address  VARCHAR(50)    NULL,
+    target_id   VARCHAR(20)    NULL,
+    resource_type VARCHAR(30)  NULL,
+    semester    VARCHAR(20)    NULL,
+    reason      VARCHAR(500)   NULL,
+    request_id  VARCHAR(64)    NULL,
     created_at  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (log_id),
-    CONSTRAINT CK_log_type CHECK (log_type IN ('登录', '选课', '成绩', '审核', '系统')),
+    CONSTRAINT CK_log_type CHECK (log_type IN ('登录', '选课', '成绩', '审核', '系统', '导出')),
     CONSTRAINT CK_log_result CHECK (result IN ('成功', '失败')),
     INDEX IX_log_user_time (user_id, log_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -96,7 +96,7 @@ const gpaTrendOpt = computed(() => ({
     ...chartBaseOpts().tooltip,
     formatter: (p) => {
       const d = p[0]
-      return `<div style="font-weight:600;margin-bottom:4px">${d.name}</div>GPA <b>${d.value}</b>`
+      return `${d.name}\nGPA ${d.value}`
     },
   },
 }))
@@ -138,7 +138,7 @@ const creditBarOpt = computed(() => ({
     ...chartBaseOpts().tooltip,
     formatter: (p) => {
       const d = p[0]
-      return `<div style="font-weight:600;margin-bottom:4px">${d.name}</div>修读 <b>${d.value}</b> 学分`
+      return `${d.name}\n修读 ${d.value} 学分`
     },
   },
 }))

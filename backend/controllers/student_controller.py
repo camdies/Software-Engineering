@@ -104,9 +104,9 @@ class StudentController:
                 return courses
         except Exception as e:
             logger.error(f"查询可选课程异常: {e}", exc_info=True)
-            return []
+            raise
 
-    def get_my_courses(self, student_id: str) -> list:
+    def get_my_courses(self, student_id: str, semester: str = None) -> list:
         """获取学生已选课程列表。
 
         Args:
@@ -117,7 +117,7 @@ class StudentController:
         """
         try:
             with self._db.get_session() as session:
-                results = (
+                query = (
                     session.query(Enrollment, CoursePlan, Course)
                     .join(CoursePlan,
                           Enrollment.plan_id == CoursePlan.plan_id)
@@ -127,8 +127,10 @@ class StudentController:
                         Enrollment.student_id == student_id,
                         Enrollment.status == "已选",
                     )
-                    .all()
                 )
+                if semester:
+                    query = query.filter(CoursePlan.semester == semester)
+                results = query.all()
                 return [
                     {
                         **c.to_dict(),
@@ -148,7 +150,7 @@ class StudentController:
                 ]
         except Exception as e:
             logger.error(f"查询已选课程异常: {e}", exc_info=True)
-            return []
+            raise
 
     def get_my_grades(self, student_id: str) -> list:
         """获取学生成绩列表。
@@ -181,4 +183,4 @@ class StudentController:
                 ]
         except Exception as e:
             logger.error(f"查询成绩列表异常: {e}", exc_info=True)
-            return []
+            raise

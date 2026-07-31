@@ -9,6 +9,12 @@
       </div>
     </div>
 
+    <el-alert v-if="auditError" type="error" :closable="false" show-icon class="audit-error">
+      <template #title>审核数据加载失败</template>
+      {{ auditError.message }}<span v-if="auditError.requestId">（请求ID: {{ auditError.requestId }}）</span>
+      <el-button size="small" @click="refreshActive">重试</el-button>
+    </el-alert>
+
     <el-tabs v-model="activeTab" @tab-change="onTabChange">
       <el-tab-pane label="密码重置" name="password">
         <el-table :data="pwdList" stripe v-loading="pwdLoading" empty-text="暂无待审核申请">
@@ -82,6 +88,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
+import { REFRESH_TTL } from '@/config/refresh-policy'
+import { useStaleRefresh } from '@/composables/useStaleRefresh'
 
 const activeTab = ref('password')
 
@@ -89,10 +97,28 @@ const pwdList = ref([]), pwdLoading = ref(false)
 const gradeList = ref([]), gradeLoading = ref(false)
 const planList = ref([]), planLoading = ref(false)
 const badge = reactive({ pwd: 0, grade: 0, plan: 0 })
+const auditError = ref(null)
 
 onMounted(async () => {
-  await Promise.all([fetchPwd(), fetchGrade(), fetchPlan(), fetchBadge()])
+  await loadData({ force: true }).catch(() => {})
 })
+
+async function loadActiveTab() {
+  auditError.value = null
+  try {
+    const loader = { password: fetchPwd, grade: fetchGrade, plan: fetchPlan }[activeTab.value]
+    await Promise.all([loader(), fetchBadge()])
+  } catch (cause) {
+    auditError.value = {
+      message: cause.apiError?.message || '无法获取审核数据，请稍后重试',
+      requestId: cause.apiError?.request_id || '',
+    }
+    throw cause
+  }
+}
+
+const { loadData, invalidate } = useStaleRefresh(loadActiveTab, REFRESH_TTL.audit, 'audit')
+function refreshActive() { invalidate(); return loadData({ force: true }).catch(() => {}) }
 
 async function fetchBadge() {
   try {
@@ -127,29 +153,30 @@ async function fetchPlan() {
   } finally { planLoading.value = false }
 }
 
-function onTabChange() { fetchBadge() }
+function onTabChange() { refreshActive() }
 
 async function handlePwd(row, action) {
   await request.post(`/audit/password-resets/${row.request_id}`, { action, comment: row._comment || '' })
   ElMessage.success(action === 'approve' ? '密码重置已通过' : '已驳回')
-  fetchPwd(); fetchBadge()
+  refreshActive()
 }
 
 async function handleGrade(row, action) {
   await request.post(`/grade/audit/${row.grade_id}`, { action, comment: row._comment || '' })
   ElMessage.success(action === 'approve' ? '成绩修改已通过' : '已驳回')
-  fetchGrade(); fetchBadge()
+  refreshActive()
 }
 
 async function handlePlan(row, action) {
   await request.post(`/audit/course-plans/${row.plan_id}`, { action, comment: row._comment || '' })
   ElMessage.success(action === 'approve' ? '授课计划已通过' : '已驳回')
-  fetchPlan(); fetchBadge()
+  refreshActive()
 }
 </script>
 
 <style scoped>
 .badge-row { display: flex; gap: var(--space-4); }
+.audit-error { margin-bottom: var(--space-4); }
 .stat-chip {
   display: inline-flex; align-items: center; gap: var(--space-2);
   padding: 4px 12px; border-radius: var(--radius-full);

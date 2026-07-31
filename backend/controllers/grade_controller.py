@@ -61,6 +61,9 @@ class GradeController:
             score_int = int(score)
 
             with self._db.get_session() as session:
+                plan = session.query(CoursePlan).filter_by(plan_id=plan_id).first()
+                if plan is None or plan.teacher_id != teacher_id:
+                    return {"success": False, "message": "无权为该课程计划录入成绩"}
                 # 确认学生已选此课
                 enrollment = session.query(Enrollment).filter_by(
                     student_id=student_id,
@@ -187,6 +190,17 @@ class GradeController:
         success_count = 0
         try:
             with self._db.get_session() as session:
+                plan = session.query(CoursePlan).filter_by(plan_id=plan_id).first()
+                if plan is None or plan.teacher_id != teacher_id:
+                    return {
+                        "success_count": 0,
+                        "fail_count": len(success_list),
+                        "fail_list": [{
+                            "row": 0,
+                            "student_id": "",
+                            "reason": "无权导入该课程成绩",
+                        }],
+                    }
                 for item in success_list:
                     try:
                         # 确认选课记录

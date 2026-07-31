@@ -41,6 +41,14 @@ if !errorlevel! neq 0 (
     exit /b 1
 )
 
+echo Checking database schema...
+"!PYTHON!" "%ROOT%\run.py" --upgrade-db-only
+if !errorlevel! neq 0 (
+    echo Database schema upgrade failed. See logs for details.
+    pause
+    exit /b 1
+)
+
 echo.
 echo Starting backend - http://localhost:5000
 echo Press Ctrl+C to stop all services.

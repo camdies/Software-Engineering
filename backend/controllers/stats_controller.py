@@ -29,7 +29,7 @@ class StatsController:
     def __init__(self):
         self._db = DatabaseManager.get_instance()
 
-    def get_class_stats(self, teacher_id: str, plan_id: int,
+    def get_class_stats(self, actor: dict, plan_id: int,
                         class_name: str = None) -> dict:
         """获取班级/课程的成绩统计数据。
 
@@ -46,6 +46,8 @@ class StatsController:
         """
         try:
             with self._db.get_session() as session:
+                from backend.api.access_policy import authorize_plan_access
+                authorize_plan_access(session, actor, plan_id, "statistics")
                 # 构建基础查询
                 query = session.query(Grade).join(
                     Student, Grade.student_id == Student.student_id
@@ -68,7 +70,15 @@ class StatsController:
                         "rank_list": [],
                     }
 
-                scores = [g.score for g in grades_with_student]
+                scores = [g.score for g in grades_with_student if g.score is not None]
+                if not scores:
+                    return {
+                        "avg_score": 0.0,
+                        "max_score": 0,
+                        "min_score": 0,
+                        "pass_rate": 0.0,
+                        "rank_list": [],
+                    }
                 total = len(scores)
                 passed = sum(1 for s in scores if s >= 60)
 
@@ -79,7 +89,7 @@ class StatsController:
 
                 # 生成排名列表
                 sorted_grades = sorted(
-                    grades_with_student,
+                    [g for g in grades_with_student if g.score is not None],
                     key=lambda g: g.score,
                     reverse=True,
                 )
@@ -106,13 +116,7 @@ class StatsController:
 
         except Exception as e:
             logger.error(f"班级统计异常: {e}", exc_info=True)
-            return {
-                "avg_score": 0.0,
-                "max_score": 0,
-                "min_score": 0,
-                "pass_rate": 0.0,
-                "rank_list": [],
-            }
+            raise
 
     def get_academic_stats(self, student_id: str) -> dict:
         """获取学生个人学业统计。
@@ -176,13 +180,9 @@ class StatsController:
 
         except Exception as e:
             logger.error(f"学业统计异常: {e}", exc_info=True)
-            return {
-                "total_credits": 0.0,
-                "cumulative_gpa": 0.0,
-                "failed_courses": [],
-            }
+            raise
 
-    def get_score_distribution(self, plan_id: int) -> dict:
+    def get_score_distribution(self, actor: dict, plan_id: int) -> dict:
         """统计某课程各分数段人数及占比。
 
         分段: 优秀(90-100), 良好(75-89), 中等(60-74), 不及格(0-59)
@@ -195,9 +195,12 @@ class StatsController:
         """
         try:
             with self._db.get_session() as session:
+                from backend.api.access_policy import authorize_plan_access
+                authorize_plan_access(session, actor, plan_id, "statistics")
                 grades = session.query(Grade).filter_by(
                     plan_id=plan_id
                 ).all()
+                grades = [grade for grade in grades if grade.score is not None]
 
                 total = len(grades)
                 if total == 0:
@@ -236,16 +239,10 @@ class StatsController:
 
         except Exception as e:
             logger.error(f"成绩分布统计异常: {e}", exc_info=True)
-            return {
-                "total": 0,
-                "excellent": {"count": 0, "ratio": 0.0},
-                "good": {"count": 0, "ratio": 0.0},
-                "medium": {"count": 0, "ratio": 0.0},
-                "fail": {"count": 0, "ratio": 0.0},
-            }
+            raise
 
     def export_stats_to_excel(self, stats_data: dict,
-                              file_path: str) -> bool:
+                              file_path: str) -> str:
         """将统计数据导出为Excel报表。"""
         try:
             from backend.utils.export_util import export_to_excel
@@ -287,14 +284,17 @@ class StatsController:
                     headers, rows, merge_ranges, file_path,
                     sheet_name="个人课表")
             else:
-                logger.warning("stats_data格式不支持Excel导出")
-                return False
+                from backend.utils.export_util import ExportError
+                raise ExportError("不支持的统计导出数据")
 
         except Exception as e:
             logger.error(f"统计导出Excel异常: {e}", exc_info=True)
-            return False
+            from backend.utils.export_util import ExportError
+            if isinstance(e, ExportError):
+                raise
+            raise ExportError("统计导出失败") from e
 
-    def get_schedule_data(self, student_id: str) -> dict:
+    def get_schedule_data(self, student_id: str, semester: str = None) -> dict:
         """获取学生课表数据（含rowspan信息用于导出）。
 
         Args:
@@ -305,61 +305,18 @@ class StatsController:
         """
         try:
             from backend.controllers.student_controller import StudentController
+            if semester is None:
+                from backend.services.semester_resolver import CurrentSemesterResolver
+                with self._db.get_session() as session:
+                    semester = CurrentSemesterResolver.resolve(session).semester
             sc = StudentController()
-            my_courses = sc.get_my_courses(student_id)
-
-            period_times = [
-                "08:30-09:10", "09:20-10:00", "10:20-11:00", "11:10-11:50",
-                "14:30-15:10", "15:20-16:00", "16:10-16:50", "17:00-17:40",
-                "19:00-19:40", "19:50-20:30", "20:40-21:20",
-            ]
-
-            grid = []
-            for p in range(11):
-                row = []
-                for d in range(7):
-                    row.append({"text": "", "rowspan": 1, "covered": False})
-                grid.append(row)
-
-            for c in my_courses:
-                start_row = c["period_start"] - 1
-                end_row = start_row + c["period_count"] - 1
-                col = c["weekday"] - 1
-
-                name = c.get("course_name", "")
-                loc = c.get("location", "")
-                display_text = f"{name}\n{loc}" if loc else name
-
-                grid[start_row][col]["text"] = display_text
-                grid[start_row][col]["rowspan"] = c["period_count"]
-
-                for r in range(start_row + 1, end_row + 1):
-                    grid[r][col]["covered"] = True
-
-            schedule = []
-            merge_ranges = []
-
-            for p in range(11):
-                row = [f"第{p + 1}节", period_times[p]]
-                for d in range(7):
-                    cell = grid[p][d]
-                    if cell["covered"]:
-                        row.append("")
-                    else:
-                        row.append(cell["text"])
-                        if cell["rowspan"] > 1:
-                            col_letter = chr(ord("C") + d)
-                            merge_ranges.append(
-                                f"{col_letter}{p + 3}:"
-                                f"{col_letter}{p + 2 + cell['rowspan']}"
-                            )
-                schedule.append(row)
-
-            return {"schedule": schedule, "merge_ranges": merge_ranges}
+            my_courses = sc.get_my_courses(student_id, semester)
+            from backend.services.schedule_grid import build_schedule_grid
+            return build_schedule_grid(my_courses, semester)
 
         except Exception as e:
             logger.error(f"获取课表数据异常: {e}", exc_info=True)
-            return {"schedule": [], "merge_ranges": []}
+            raise
 
     def get_gpa_trend(self, student_id: str) -> dict:
         try:
@@ -409,4 +366,4 @@ class StatsController:
 
         except Exception as e:
             logger.error(f"GPA趋势异常: {e}", exc_info=True)
-            return {"semesters": [], "overall_gpa": 0.0}
+            raise

@@ -49,7 +49,8 @@ class TestGrade(unittest.TestCase):
     def test_record_grade_valid(self):
         from backend.controllers.grade_controller import GradeController
         session_mock = MagicMock(); self._mock_session(session_mock)
-        session_mock.query.return_value.filter_by.return_value.first.side_effect = [MagicMock(), None]
+        plan = MagicMock(); plan.teacher_id = "T001"
+        session_mock.query.return_value.filter_by.return_value.first.side_effect = [plan, MagicMock(), None]
         result = GradeController().record_grade("T001", "STU001", 1, 85)
         self.assertTrue(result["success"])
 
@@ -63,11 +64,13 @@ class TestGrade(unittest.TestCase):
     def test_record_grade_boundary(self):
         from backend.controllers.grade_controller import GradeController
         session_mock = MagicMock(); self._mock_session(session_mock)
-        # first() returns [enrollment_mock, None] per score iteration
+        plans = []
+        for _ in range(3):
+            plan = MagicMock(); plan.teacher_id = "T001"; plans.append(plan)
         session_mock.query.return_value.filter_by.return_value.first.side_effect = [
-            MagicMock(), None,  # score=0
-            MagicMock(), None,  # score=60
-            MagicMock(), None,  # score=100
+            plans[0], MagicMock(), None,  # score=0
+            plans[1], MagicMock(), None,  # score=60
+            plans[2], MagicMock(), None,  # score=100
         ]
         ctrl = GradeController()
         for s in [0, 60, 100]:

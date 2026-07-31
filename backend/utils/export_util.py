@@ -5,7 +5,9 @@ export_util.py - Excel/PDF导出工具
 """
 
 import os
+import zipfile
 from openpyxl import Workbook
+from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
@@ -29,13 +31,42 @@ THIN_BORDER = Border(
 )
 
 
+class ExportError(RuntimeError):
+    """Raised when an export cannot be created or fails structural validation."""
+
+
+def validate_xlsx(file_path, *, sheet_name, headers, merge_ranges=None):
+    if not os.path.isfile(file_path) or os.path.getsize(file_path) < 1024:
+        raise ExportError("导出文件不存在或大小异常")
+    if not zipfile.is_zipfile(file_path):
+        raise ExportError("导出文件不是有效的 XLSX 容器")
+    try:
+        workbook = load_workbook(file_path, read_only=False, data_only=False)
+        if sheet_name not in workbook.sheetnames:
+            raise ExportError("导出工作表缺失")
+        sheet = workbook[sheet_name]
+        actual_headers = [sheet.cell(1, i + 1).value for i in range(len(headers))]
+        if actual_headers != headers:
+            raise ExportError("导出表头校验失败")
+        actual_merges = {str(item) for item in sheet.merged_cells.ranges}
+        expected_merges = set(merge_ranges or [])
+        if not expected_merges.issubset(actual_merges):
+            raise ExportError("导出合并单元格校验失败")
+        workbook.close()
+    except ExportError:
+        raise
+    except Exception as exc:
+        raise ExportError("导出文件无法重新打开") from exc
+    return file_path
+
+
 def export_to_excel(
     headers: list,
     data_rows: list,
     file_path: str,
     sheet_name: str = "Sheet1",
     summary_row: dict = None,
-) -> bool:
+) -> str:
     """将数据导出为Excel文件。
 
     Args:
@@ -101,10 +132,12 @@ def export_to_excel(
                     else ".", exist_ok=True)
         wb.save(file_path)
         logger.info(f"Excel导出成功: {file_path}")
-        return True
+        return validate_xlsx(
+            file_path, sheet_name=sheet_name, headers=headers
+        )
     except Exception as e:
         logger.error(f"Excel导出失败: {e}")
-        return False
+        raise ExportError("Excel 导出失败") from e
 
 
 def export_schedule_to_excel(
@@ -113,7 +146,7 @@ def export_schedule_to_excel(
     merge_ranges: list,
     file_path: str,
     sheet_name: str = "个人课表",
-) -> bool:
+) -> str:
     """导出带合并单元格的课表Excel文件。
 
     Args:
@@ -167,7 +200,12 @@ def export_schedule_to_excel(
                     else ".", exist_ok=True)
         wb.save(file_path)
         logger.info(f"课表Excel导出成功: {file_path}")
-        return True
+        return validate_xlsx(
+            file_path,
+            sheet_name=sheet_name,
+            headers=headers,
+            merge_ranges=merge_ranges,
+        )
     except Exception as e:
         logger.error(f"课表Excel导出失败: {e}")
-        return False
+        raise ExportError("课表 Excel 导出失败") from e

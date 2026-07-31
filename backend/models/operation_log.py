@@ -61,6 +61,11 @@ class OperationLog(Base):
         String(50),
         comment="操作IP地址",
     )
+    target_id = Column(String(20), comment="审计目标用户ID")
+    resource_type = Column(String(30), comment="审计资源类型")
+    semester = Column(String(20), comment="审计学期")
+    reason = Column(String(500), comment="代操作原因")
+    request_id = Column(String(64), comment="请求追踪ID")
     created_at = Column(
         DateTime,
         default=datetime.now,
@@ -93,6 +98,11 @@ class OperationLog(Base):
             "result": self.result,
             "log_time": self.log_time.isoformat() if self.log_time else None,
             "ip_address": self.ip_address,
+            "target_id": self.target_id,
+            "resource_type": self.resource_type,
+            "semester": self.semester,
+            "reason": self.reason,
+            "request_id": self.request_id,
             "created_at": (
                 self.created_at.isoformat() if self.created_at else None
             ),

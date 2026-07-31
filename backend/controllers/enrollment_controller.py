@@ -1,470 +1,219 @@
-"""
-backend/controllers/enrollment_controller.py - 选课核心控制器
-
-负责选课/退课的核心业务逻辑，是本系统最关键的模块。
-严格保证并发安全：使用数据库行级锁（SELECT ... FOR UPDATE）
-防止选课超额，所有写操作在同一事务中执行。
-"""
+"""Concurrency-safe enrollment and drop workflows."""
 
 from datetime import datetime
-from sqlalchemy import text
+
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from backend.models.base import DatabaseManager
+from backend.models.course import Course
 from backend.models.course_plan import CoursePlan
 from backend.models.enrollment import Enrollment
 from backend.models.grade import Grade
 from backend.models.operation_log import OperationLog
-from backend.models.course import Course
+from backend.models.student import Student
 from backend.utils.log_util import get_logger
 
 logger = get_logger("enrollment_controller")
 
 
 class EnrollmentController:
-    """选课核心控制器。
+    """Serialize one student's schedule changes and one plan's capacity changes."""
 
-    提供选课、退课功能。
-    选课流程包含5项严格校验，所有校验通过后在同一事务中完成数据写入。
-    选课操作使用 SELECT ... FOR UPDATE 行级锁防止超额选课。
-    """
+    MAX_DEADLOCK_RETRIES = 2
 
     def __init__(self):
         self._db = DatabaseManager.get_instance()
 
+    @staticmethod
+    def _failure(message, code, status_code):
+        return {
+            "success": False,
+            "message": message,
+            "code": code,
+            "status_code": status_code,
+        }
+
     def select_course(self, student_id: str, plan_id: int) -> dict:
-        """学生选课操作。
+        for attempt in range(self.MAX_DEADLOCK_RETRIES + 1):
+            try:
+                return self._select_once(student_id, plan_id)
+            except OperationalError as exc:
+                if self._is_deadlock(exc) and attempt < self.MAX_DEADLOCK_RETRIES:
+                    logger.warning("选课事务死锁，准备重试: attempt=%s", attempt + 1)
+                    continue
+                logger.error("选课数据库异常", exc_info=True)
+                return self._failure("选课服务暂时不可用", "ENROLLMENT_DB_UNAVAILABLE", 503)
+            except IntegrityError:
+                logger.info("选课唯一约束冲突: student=%s plan=%s", student_id, plan_id)
+                return self._failure("您已选择该课程，请勿重复提交", "ALREADY_ENROLLED", 409)
+            except Exception:
+                logger.error("选课操作异常", exc_info=True)
+                return self._failure("选课服务暂时不可用", "ENROLLMENT_SERVICE_UNAVAILABLE", 503)
 
-        按顺序执行5项校验，任一失败立即返回对应错误信息：
-        1. 选课时段校验 — 当前时间是否在选课开放时段内
-        2. 重复选课校验 — 是否已选择该课程且状态为"已选"
-        3. 时间冲突校验 — 与已选课程时间是否冲突
-        4. 容量校验 — 课程是否还有余量（使用行级锁）
-        5. 先修课校验 — 是否已完成先修课程要求
+    def _select_once(self, student_id, plan_id):
+        with self._db.get_session() as session:
+            period_result = self._check_enrollment_period(session)
+            if not period_result["valid"]:
+                return self._failure(period_result["message"], "ENROLLMENT_CLOSED", 409)
 
-        所有校验通过后，在同一事务中：
-        - 插入 enrollment 记录
-        - 更新 course_plan 的 enrolled 计数
-        - 写入 operation_log
+            # Global lock order: Student -> CoursePlan -> Enrollment.
+            student = self._locked_first(session, Student, student_id=student_id)
+            if student is None:
+                return self._failure("学生不存在", "STUDENT_NOT_FOUND", 404)
 
-        Args:
-            student_id: 学生学号。
-            plan_id: 开课计划ID。
+            plan = self._locked_first(session, CoursePlan, plan_id=plan_id)
+            if plan is None or plan.status != "已通过":
+                return self._failure("课程不存在或未开放选课", "PLAN_NOT_AVAILABLE", 409)
 
-        Returns:
-            dict: {'success': bool, 'message': str}
-        """
-        try:
-            with self._db.get_session() as session:
-                # --- 校验1: 选课时段校验 ---
-                period_result = self._check_enrollment_period()
-                if not period_result["valid"]:
-                    msg = period_result["message"]
-                    self._write_log(session, student_id, "选课",
-                                    f"选课失败(时段): {msg}", "失败", "")
-                    logger.info(f"学生{student_id}选课plan_id={plan_id}失败"
-                                f"(时段校验): {msg}")
-                    return {"success": False, "message": msg}
+            existing = self._locked_first(
+                session, Enrollment, student_id=student_id, plan_id=plan_id
+            )
+            if existing is not None and existing.status == "已选":
+                return self._failure("您已选择该课程，请勿重复提交", "ALREADY_ENROLLED", 409)
 
-                # 获取开课计划信息
-                plan = session.query(CoursePlan).filter_by(
-                    plan_id=plan_id, status="已通过"
-                ).first()
-                if plan is None:
-                    self._write_log(session, student_id, "选课",
-                                    f"选课失败: 开课计划{plan_id}不存在或未审核通过",
-                                    "失败", "")
-                    return {"success": False,
-                            "message": "课程不存在或未开放选课"}
+            conflict = self._check_time_conflict(session, student_id, plan)
+            if conflict["conflict"]:
+                return self._failure("上课时间冲突，请重新选择", "SCHEDULE_CONFLICT", 409)
 
-                # --- 校验2: 重复选课校验 ---
-                # Check ANY existing enrollment (both "已选" and "已退") because
-                # the DB has a UNIQUE(student_id, plan_id) constraint.  If the
-                # student previously dropped this course, reactivate the old
-                # row instead of trying to INSERT a duplicate.
-                existing = session.query(Enrollment).filter_by(
-                    student_id=student_id, plan_id=plan_id
-                ).first()
-                if existing:
-                    if existing.status == "已选":
-                        self._write_log(session, student_id, "选课",
-                                        f"重复选课: plan_id={plan_id}", "失败", "")
-                        logger.info(f"学生{student_id}重复选课plan_id={plan_id}")
-                        return {"success": False,
-                                "message": "您已选择该课程，请勿重复提交"}
-                    # Previously dropped — reactivate
-                    existing.status = "已选"
-                    existing.enroll_time = datetime.now()
-                    plan.enrolled = (plan.enrolled or 0) + 1
-                    self._write_log(session, student_id, "选课",
-                                    f"重新选课成功: plan_id={plan_id}", "成功", "")
-                    logger.info(f"学生{student_id}重新选课: plan_id={plan_id}")
-                    return {"success": True, "message": "选课成功！"}
+            current_enrolled = int(plan.enrolled or 0)
+            capacity = int(plan.capacity or 0)
+            if current_enrolled >= capacity:
+                return self._failure("课程容量已满，请选择其他课程", "COURSE_FULL", 409)
 
-                # --- 校验3: 时间冲突校验 ---
-                conflict_result = self._check_time_conflict(
-                    session, student_id, plan
+            prereq = self._check_prerequisite(session, student_id, plan)
+            if not prereq["passed"]:
+                return self._failure(
+                    f"未完成先修课要求，请先完成: {prereq['course_names']}",
+                    "PREREQUISITE_NOT_MET",
+                    422,
                 )
-                if conflict_result["conflict"]:
-                    self._write_log(session, student_id, "选课",
-                                    f"时间冲突: plan_id={plan_id}", "失败", "")
-                    return {"success": False,
-                            "message": "上课时间冲突，请重新选择"}
 
-                # --- 校验4: 容量校验（使用行级锁） ---
-                # 使用 SELECT ... FOR UPDATE 锁定course_plan行，
-                # 防止并发选课时的超额问题。
-                # 事务边界: 从锁定操作开始到session.commit()为止。
-                capacity_result = self._check_and_lock_capacity(
-                    session, plan
-                )
-                if not capacity_result["available"]:
-                    self._write_log(session, student_id, "选课",
-                                    f"容量已满: plan_id={plan_id}", "失败", "")
-                    return {"success": False,
-                            "message": "课程容量已满，请选择其他课程"}
-
-                # --- 校验5: 先修课校验 ---
-                prereq_result = self._check_prerequisite(
-                    session, student_id, plan
-                )
-                if not prereq_result["passed"]:
-                    self._write_log(session, student_id, "选课",
-                                    f"先修课未通过: plan_id={plan_id}",
-                                    "失败", "")
-                    return {
-                        "success": False,
-                        "message": (
-                            "未完成先修课要求，请先完成: "
-                            f"{prereq_result['course_names']}"
-                        ),
-                    }
-
-                # --- 所有校验通过，执行数据写入 ---
-                # 插入选课记录
-                enrollment = Enrollment(
+            if existing is None:
+                session.add(Enrollment(
                     student_id=student_id,
                     plan_id=plan_id,
                     enroll_time=datetime.now(),
                     status="已选",
-                )
-                session.add(enrollment)
-
-                # 更新已选人数（course_plan行已通过FOR UPDATE锁定）
-                plan.enrolled = (plan.enrolled or 0) + 1
-
-                # 写入操作日志
-                self._write_log(session, student_id, "选课",
-                                f"选课成功: plan_id={plan_id}", "成功", "")
-                logger.info(
-                    f"学生{student_id}选课成功: plan_id={plan_id}"
-                )
-
-                # 事务在此自动提交（由 get_session 上下文管理器处理）
-                return {"success": True, "message": "选课成功！"}
-
-        except Exception as e:
-            logger.error(f"选课操作异常: {e}", exc_info=True)
-            return {"success": False, "message": "操作失败，请重试"}
+                ))
+            else:
+                # Reactivation happens only after all validations pass.
+                existing.status = "已选"
+                existing.enroll_time = datetime.now()
+            plan.enrolled = current_enrolled + 1
+            self._write_log(
+                session, student_id, "选课", f"选课成功: plan_id={plan_id}", "成功"
+            )
+            return {"success": True, "message": "选课成功！"}
 
     def drop_course(self, student_id: str, plan_id: int) -> dict:
-        """学生退课操作。
-
-        验证选课记录存在后，在事务中：
-        - UPDATE enrollment SET status='已退'
-        - UPDATE course_plan SET enrolled = enrolled - 1
-        - 写入退课日志
-
-        Args:
-            student_id: 学生学号。
-            plan_id: 开课计划ID。
-
-        Returns:
-            dict: {'success': bool, 'message': str}
-        """
-        try:
-            with self._db.get_session() as session:
-                enrollment = session.query(Enrollment).filter_by(
-                    student_id=student_id, plan_id=plan_id, status="已选"
-                ).first()
-                if enrollment is None:
-                    return {"success": False,
-                            "message": "未找到有效的选课记录"}
-
-                enrollment.status = "已退"
-
-                plan = session.query(CoursePlan).filter_by(
-                    plan_id=plan_id
-                ).first()
-                if plan and (plan.enrolled or 0) > 0:
-                    plan.enrolled = plan.enrolled - 1
-
-                self._write_log(session, student_id, "选课",
-                                f"退课成功: plan_id={plan_id}", "成功", "")
-                logger.info(
-                    f"学生{student_id}退课成功: plan_id={plan_id}"
-                )
-
-                return {"success": True, "message": "退课成功！"}
-
-        except Exception as e:
-            logger.error(f"退课操作异常: {e}", exc_info=True)
-            return {"success": False, "message": "操作失败，请重试"}
-
-    # ---- 内部校验方法 ----
-
-    def _check_enrollment_period(self) -> dict:
-        """校验当前时间是否在选课开放时段内。
-
-        优先检查数据库 semester_config 表；
-        回退到 config.ini。
-
-        Returns:
-            dict: {'valid': bool, 'message': str}
-        """
-        try:
-            from backend.models.base import DatabaseManager
-            from backend.models.semester_config import SemesterConfig
-
-            # 优先检查数据库中的 semester_config 表
-            db = DatabaseManager.get_instance()
-            with db.get_session() as s:
-                sc = s.query(SemesterConfig).filter_by(is_current=1).first()
-                if sc:
-                    if not sc.enrollment_open:
-                        return {"valid": False,
-                                "message": "当前学期选课未开放"}
-                    if sc.enroll_start and sc.enroll_end:
-                        now = datetime.now()
-                        if now < sc.enroll_start:
-                            return {"valid": False,
-                                    "message": f"选课尚未开始，开始时间: {sc.enroll_start.strftime('%Y-%m-%d %H:%M')}"}
-                        if now > sc.enroll_end:
-                            return {"valid": False,
-                                    "message": "选课已结束"}
-                    return {"valid": True, "message": ""}
-
-            # 回退到 config.ini（兼容旧版）
-            from backend.config.settings import Settings
-            settings = Settings.get_instance()
-            if not settings.enrollment_is_open:
-                return {"valid": False,
-                        "message": "当前不在选课时段，无法提交选课"}
-            open_time_str = settings.enrollment_open_time
-            close_time_str = settings.enrollment_close_time
-            if open_time_str and close_time_str:
-                open_time = datetime.strptime(
-                    open_time_str, "%Y-%m-%d %H:%M:%S"
-                )
-                close_time = datetime.strptime(
-                    close_time_str, "%Y-%m-%d %H:%M:%S"
-                )
-                now = datetime.now()
-                if now < open_time or now > close_time:
-                    return {"valid": False,
-                            "message": "当前不在选课时段，无法提交选课"}
-            return {"valid": True, "message": ""}
-        except Exception as e:
-            logger.error(f"选课时段校验异常: {e}")
-            return {"valid": True, "message": ""}
-
-    def _check_time_conflict(self, session, student_id: str,
-                             target_plan: CoursePlan) -> dict:
-        """校验学生已选课程与目标课程是否存在时间冲突。
-
-        使用 weekday + period_start + period_count 做重叠判断。
-        同时检查 week 范围重叠（周数冲突）。
-
-        Args:
-            session: 数据库会话。
-            student_id: 学生学号。
-            target_plan: 目标课程开课计划。
-
-        Returns:
-            dict: {'conflict': bool}
-        """
-        try:
-            tw = target_plan.weekday
-            tps = target_plan.period_start
-            tpe = tps + target_plan.period_count - 1
-            tws = target_plan.start_week or 1
-            twe = target_plan.end_week or 20
-
-            enrolled_plans = (
-                session.query(CoursePlan)
-                .join(Enrollment, Enrollment.plan_id == CoursePlan.plan_id)
-                .filter(
-                    Enrollment.student_id == student_id,
-                    Enrollment.status == "已选",
-                    CoursePlan.status == "已通过",
-                )
-                .all()
-            )
-
-            for ep in enrolled_plans:
-                # 跳过自己
-                if ep.plan_id == target_plan.plan_id:
+        for attempt in range(self.MAX_DEADLOCK_RETRIES + 1):
+            try:
+                with self._db.get_session() as session:
+                    student = self._locked_first(session, Student, student_id=student_id)
+                    if student is None:
+                        return self._failure("学生不存在", "STUDENT_NOT_FOUND", 404)
+                    plan = self._locked_first(session, CoursePlan, plan_id=plan_id)
+                    enrollment = self._locked_first(
+                        session,
+                        Enrollment,
+                        student_id=student_id,
+                        plan_id=plan_id,
+                    )
+                    if enrollment is None or enrollment.status != "已选":
+                        return self._failure("未找到有效的选课记录", "ENROLLMENT_NOT_FOUND", 404)
+                    enrollment.status = "已退"
+                    if plan is not None and int(plan.enrolled or 0) > 0:
+                        plan.enrolled = int(plan.enrolled) - 1
+                    self._write_log(
+                        session, student_id, "选课", f"退课成功: plan_id={plan_id}", "成功"
+                    )
+                    return {"success": True, "message": "退课成功！"}
+            except OperationalError as exc:
+                if self._is_deadlock(exc) and attempt < self.MAX_DEADLOCK_RETRIES:
                     continue
-                ew = ep.weekday
-                eps = ep.period_start
-                epe = eps + ep.period_count - 1
-                ews = ep.start_week or 1
-                ewe = ep.end_week or 20
+                return self._failure("退课服务暂时不可用", "ENROLLMENT_DB_UNAVAILABLE", 503)
+            except Exception:
+                logger.error("退课操作异常", exc_info=True)
+                return self._failure("退课服务暂时不可用", "ENROLLMENT_SERVICE_UNAVAILABLE", 503)
 
-                # 同一天且节次重叠
-                if ew == tw and eps <= tpe and epe >= tps:
-                    # 周数也有重叠
-                    if ews <= twe and ewe >= tws:
-                        return {"conflict": True}
+    def _locked_first(self, session, model, **filters):
+        query = session.query(model)
+        if getattr(self._db, "is_mssql", False) is True:
+            query = query.with_hint(
+                model, "WITH (UPDLOCK, ROWLOCK, HOLDLOCK)", dialect_name="mssql"
+            )
+        else:
+            query = query.with_for_update()
+        return query.filter_by(**filters).first()
 
-            return {"conflict": False}
-        except Exception as e:
-            logger.error(f"时间冲突校验异常: {e}")
-            return {"conflict": False}
+    @staticmethod
+    def _is_deadlock(exc):
+        args = getattr(getattr(exc, "orig", None), "args", ())
+        joined = " ".join(str(item) for item in args)
+        return "1213" in joined or "1205" in joined
 
-    def _parse_time_slot(self, time_slot: str) -> tuple:
-        """解析时间槽字符串为可比较的元组。
+    def _check_enrollment_period(self, session=None) -> dict:
+        from backend.services.semester_resolver import CurrentSemesterResolver
 
-        Args:
-            time_slot: 时间字符串，如 '周一1-2节'。
+        if session is not None:
+            semester = CurrentSemesterResolver.resolve(session)
+            if not semester.enrollment_open:
+                return {"valid": False, "message": "当前学期选课未开放"}
+            now = datetime.now()
+            if semester.enroll_start and now < semester.enroll_start:
+                return {"valid": False, "message": "选课尚未开始"}
+            if semester.enroll_end and now > semester.enroll_end:
+                return {"valid": False, "message": "选课已结束"}
+            return {"valid": True, "message": ""}
+        with self._db.get_session() as managed_session:
+            return self._check_enrollment_period(managed_session)
 
-        Returns:
-            tuple: (星期, 起始节, 结束节) 或 None
-        """
-        import re
-
-        match = re.match(
-            r'(周[一二三四五六日天])(\d+)-(\d+)节', time_slot
+    def _check_time_conflict(self, session, student_id, target_plan):
+        target_end = target_plan.period_start + target_plan.period_count - 1
+        target_start_week = target_plan.start_week or 1
+        target_end_week = target_plan.end_week or 20
+        enrolled_plans = (
+            session.query(CoursePlan)
+            .join(Enrollment, Enrollment.plan_id == CoursePlan.plan_id)
+            .filter(
+                Enrollment.student_id == student_id,
+                Enrollment.status == "已选",
+                CoursePlan.status == "已通过",
+            )
+            .all()
         )
-        if not match:
-            return None
-        return (match.group(1), int(match.group(2)), int(match.group(3)))
+        for plan in enrolled_plans:
+            if plan.plan_id == target_plan.plan_id or plan.weekday != target_plan.weekday:
+                continue
+            plan_end = plan.period_start + plan.period_count - 1
+            period_overlap = plan.period_start <= target_end and plan_end >= target_plan.period_start
+            week_overlap = (plan.start_week or 1) <= target_end_week and (plan.end_week or 20) >= target_start_week
+            if period_overlap and week_overlap:
+                return {"conflict": True}
+        return {"conflict": False}
 
-    def _check_and_lock_capacity(self, session,
-                                 plan: CoursePlan) -> dict:
-        """检查课程容量并使用行级锁防止超额。
-
-        使用 SELECT ... FOR UPDATE 锁定 course_plan 行，
-        在事务提交前阻止其他事务修改该行，确保 enrolled < capacity
-        的校验和 enrolled 更新是原子操作。
-
-        Args:
-            session: 数据库会话。
-            plan: 目标开课计划对象（已加载）。
-
-        Returns:
-            dict: {'available': bool}
-        """
-        try:
-            # 刷新plan对象并从数据库锁定该行
-            # FOR UPDATE 行级锁：锁定plan_id对应的行，其他并发事务的
-            # SELECT FOR UPDATE 将等待当前事务提交后才能读取，
-            # 确保 capacity 校验和 enrolled+1 的原子性。
-            locked_plan = (
-                session.query(CoursePlan)
-                .filter(CoursePlan.plan_id == plan.plan_id)
-                .with_for_update()
+    def _check_prerequisite(self, session, student_id, plan):
+        course_ids = [item.strip() for item in (plan.prerequisite or "").split(",") if item.strip()]
+        failed = []
+        for course_id in course_ids:
+            grade = (
+                session.query(Grade)
+                .filter(Grade.student_id == student_id, Grade.score >= 60)
+                .join(CoursePlan, Grade.plan_id == CoursePlan.plan_id)
+                .filter(CoursePlan.course_id == course_id)
                 .first()
             )
-            if locked_plan is None:
-                return {"available": False}
+            if grade is None:
+                course = session.query(Course).filter_by(course_id=course_id).first()
+                failed.append(course.course_name if course else course_id)
+        return {"passed": not failed, "course_names": "、".join(failed)}
 
-            current_enrolled = locked_plan.enrolled or 0
-            capacity = locked_plan.capacity or 0
-
-            if current_enrolled >= capacity:
-                logger.warning(
-                    f"课程plan_id={plan.plan_id}容量已满 "
-                    f"({current_enrolled}/{capacity})"
-                )
-                return {"available": False}
-
-            # 更新plan引用为锁定后的对象
-            plan.enrolled = locked_plan.enrolled
-            return {"available": True}
-
-        except Exception as e:
-            logger.error(f"容量校验异常: {e}", exc_info=True)
-            return {"available": False}
-
-    def _check_prerequisite(self, session, student_id: str,
-                            plan: CoursePlan) -> dict:
-        """校验学生是否完成先修课程要求。
-
-        查询 course_plan.prerequisite 字段（逗号分隔的课程代码列表），
-        确认每门先修课在 grade 表中 score >= 60。
-
-        Args:
-            session: 数据库会话。
-            student_id: 学生学号。
-            plan: 目标开课计划。
-
-        Returns:
-            dict: {'passed': bool, 'course_names': str}
-        """
-        try:
-            prereq_str = plan.prerequisite
-            if not prereq_str or not prereq_str.strip():
-                return {"passed": True, "course_names": ""}
-
-            prereq_course_ids = [
-                c.strip() for c in prereq_str.split(",") if c.strip()
-            ]
-            if not prereq_course_ids:
-                return {"passed": True, "course_names": ""}
-
-            failed_courses = []
-            for course_id in prereq_course_ids:
-                grade = (
-                    session.query(Grade)
-                    .filter(
-                        Grade.student_id == student_id,
-                        Grade.score >= 60,
-                    )
-                    .join(CoursePlan,
-                          Grade.plan_id == CoursePlan.plan_id)
-                    .filter(CoursePlan.course_id == course_id)
-                    .first()
-                )
-                if grade is None:
-                    # 获取课程名称用于友好提示
-                    course = session.query(Course).filter_by(
-                        course_id=course_id
-                    ).first()
-                    course_name = (
-                        course.course_name if course else course_id
-                    )
-                    failed_courses.append(course_name)
-
-            if failed_courses:
-                return {
-                    "passed": False,
-                    "course_names": "、".join(failed_courses),
-                }
-
-            return {"passed": True, "course_names": ""}
-
-        except Exception as e:
-            logger.error(f"先修课校验异常: {e}", exc_info=True)
-            return {"passed": False, "course_names": "未知课程"}
-
-    def _write_log(self, session, user_id: str, log_type: str,
-                   operation: str, result: str, ip_address: str = ""
-                   ) -> None:
-        try:
-            log_entry = OperationLog(
-                user_id=user_id,
-                log_type=log_type,
-                operation=operation,
-                result=result,
-                log_time=datetime.now(),
-                ip_address=ip_address,
-            )
-            session.add(log_entry)
-            session.flush()
-        except Exception:
-            try:
-                session.rollback()
-                session.expunge(log_entry)
-            except Exception:
-                pass
-            logger.warning(f"操作日志写入失败（已跳过）: user={user_id} {operation}")
+    def _write_log(self, session, user_id, log_type, operation, result, ip_address=""):
+        session.add(OperationLog(
+            user_id=user_id,
+            log_type=log_type,
+            operation=operation,
+            result=result,
+            log_time=datetime.now(),
+            ip_address=ip_address,
+        ))

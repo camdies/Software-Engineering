@@ -54,9 +54,9 @@ class TeacherController:
                 ]
         except Exception as e:
             logger.error(f"查询教师授课计划异常: {e}", exc_info=True)
-            return []
+            raise
 
-    def get_enrolled_students(self, plan_id: int) -> list:
+    def get_enrolled_students(self, teacher_id: str, plan_id: int) -> list:
         """获取某课程的选课学生列表。
 
         Args:
@@ -67,6 +67,12 @@ class TeacherController:
         """
         try:
             with self._db.get_session() as session:
+                owned = session.query(CoursePlan).filter_by(
+                    plan_id=plan_id, teacher_id=teacher_id
+                ).first()
+                if owned is None:
+                    from backend.api.errors import ForbiddenError
+                    raise ForbiddenError("无权查看该课程的学生名单")
                 results = (
                     session.query(Student, Enrollment)
                     .join(Enrollment, Student.student_id == Enrollment.student_id)
@@ -82,4 +88,4 @@ class TeacherController:
                 ]
         except Exception as e:
             logger.error(f"查询选课学生列表异常: {e}", exc_info=True)
-            return []
+            raise

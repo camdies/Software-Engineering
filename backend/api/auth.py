@@ -1,138 +1,137 @@
-"""backend/api/auth.py — JWT 认证与授权。
+"""JWT authentication, account revocation, and role authorization."""
 
-提供：
-- create_token() — 登录成功后生成 JWT
-- @require_auth — 要求有效 JWT 的装饰器
-- @require_role(*roles) — 要求特定角色的装饰器工厂
-
-JWT payload: {user_id, role, exp, iat}
-使用 HS256 签名，密钥来自 config.ini [web].jwt_secret。
-"""
-
-import os
 import functools
+import hashlib
+import os
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from flask import request, g
+from flask import g, request
 
 from backend.api.response import error_response
 
 
-# 默认密钥 — 优先从 config.ini 读取，否则使用固定密钥避免
-# 每次进程重启 JWT 全部失效（Flask Debug 模式热重载会触发此问题）。
-# 如果 config.ini 中配置了 [web].jwt_secret，则使用配置的值；
-# 否则使用基于机器名的固定密钥（jwt 库要求至少 32 字符的 hex 串）。
-import hashlib
-import platform
+_JWT_ALGORITHM = "HS256"
+_DEV_SECRET = hashlib.sha256(b"edumgmt-development-only-secret").hexdigest()
 
-def _generate_stable_secret() -> str:
-    """生成稳定的默认 JWT 密钥。
 
-    若 config.ini 中配置了 [web].jwt_secret 则使用它；
-    否则基于主机名生成固定值，保证进程重启后 JWT 仍然有效。
-    """
+def _jwt_settings():
+    configured = os.environ.get("EDUMGMT_JWT_SECRET", "").strip()
+    expiration = 24
     try:
         from backend.config.settings import Settings
-        configured = Settings.get_instance()._config.get("web", "jwt_secret", fallback="")
-        if configured.strip():
-            return configured.strip()
+
+        settings = Settings.get_instance()
+        configured = configured or settings.jwt_secret.strip()
+        expiration = settings.jwt_expiration_hours
     except Exception:
         pass
-    # 回退：用主机名生成稳定密钥
-    raw = f"edu-mgmt-sys::{platform.node()}"
-    return hashlib.sha256(raw.encode()).hexdigest()
-
-_JWT_SECRET = _generate_stable_secret()
-_JWT_ALGORITHM = "HS256"
-_JWT_EXPIRATION_HOURS = 24
+    return configured or _DEV_SECRET, expiration
 
 
-def create_token(user_id: str, role: str) -> str:
-    """生成 JWT。
+def validate_jwt_configuration(production=False):
+    """Fail closed in production when no strong, non-default secret is set."""
+    secret, _ = _jwt_settings()
+    placeholders = {
+        _DEV_SECRET,
+        "REPLACE_WITH_AT_LEAST_32_RANDOM_CHARACTERS",
+        "CHANGE_ME",
+    }
+    if production and (secret in placeholders or len(secret) < 32):
+        raise RuntimeError(
+            "Production requires EDUMGMT_JWT_SECRET or [web].jwt_secret "
+            "with at least 32 characters"
+        )
 
-    Args:
-        user_id: 用户账号。
-        role: 用户角色 (admin/teacher/student)。
 
-    Returns:
-        str: 编码后的 JWT 字符串。
-    """
+def create_token(user_id: str, role: str, token_version: int = 0) -> str:
+    secret, expiration = _jwt_settings()
     now = datetime.now(timezone.utc)
     payload = {
         "user_id": user_id,
         "role": role,
+        "token_version": int(token_version or 0),
         "iat": now,
-        "exp": now + timedelta(hours=_JWT_EXPIRATION_HOURS),
+        "exp": now + timedelta(hours=expiration),
     }
-    return jwt.encode(payload, _JWT_SECRET, algorithm=_JWT_ALGORITHM)
+    return jwt.encode(payload, secret, algorithm=_JWT_ALGORITHM)
 
 
 def decode_token(token: str) -> dict | None:
-    """解码并验证 JWT。
-
-    Args:
-        token: JWT 字符串。
-
-    Returns:
-        dict | None: payload 字典，验证失败返回 None。
-    """
     try:
-        return jwt.decode(token, _JWT_SECRET, algorithms=[_JWT_ALGORITHM])
-    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        secret, _ = _jwt_settings()
+        return jwt.decode(token, secret, algorithms=[_JWT_ALGORITHM])
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, TypeError):
         return None
 
 
 def require_auth(f):
-    """Require a valid JWT Bearer token.
-
-    Extracts token from Authorization header, decodes JWT, and sets
-    `g.current_user = {"user_id", "role"}`.  Returns 401 on missing/
-    expired tokens.
-
-    The is_locked check is deliberately NOT done here — it would add
-    a database round-trip to every API call and freeze the UI when
-    the DB is slow.  Locked accounts are already prevented from
-    logging in (auth_controller.py line 71), and existing tokens of
-    a just-locked user will expire naturally.
-    """
+    """Authenticate the token and re-check current account security state."""
     @functools.wraps(f)
     def decorated(*args, **kwargs):
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
-            return error_response("未登录或登录已过期", status_code=401)
+            return error_response(
+                "未登录或登录已过期", status_code=401, code="AUTH_REQUIRED"
+            )
 
-        token = auth_header[7:]
-        payload = decode_token(token)
-        if payload is None:
-            return error_response("未登录或登录已过期", status_code=401)
+        payload = decode_token(auth_header[7:])
+        if not payload or not payload.get("user_id"):
+            return error_response(
+                "登录凭证无效或已过期", status_code=401, code="TOKEN_INVALID"
+            )
 
-        g.current_user = {
-            "user_id": payload["user_id"],
-            "role": payload["role"],
-        }
+        try:
+            from backend.models.base import DatabaseManager
+            from backend.models.user_account import UserAccount
+
+            with DatabaseManager.get_instance().get_session() as session:
+                account = session.query(UserAccount).filter_by(
+                    user_id=payload["user_id"]
+                ).first()
+                if account is None:
+                    return error_response(
+                        "账号不存在", status_code=401, code="ACCOUNT_NOT_FOUND"
+                    )
+                if account.is_locked == 1:
+                    return error_response(
+                        "账号已锁定", status_code=401, code="ACCOUNT_LOCKED"
+                    )
+                current_version = int(account.token_version or 0)
+                if int(payload.get("token_version", -1)) != current_version:
+                    return error_response(
+                        "登录凭证已撤销", status_code=401, code="TOKEN_REVOKED"
+                    )
+                g.current_user = {
+                    "user_id": account.user_id,
+                    "role": account.role,
+                    "token_version": current_version,
+                }
+        except Exception:
+            return error_response(
+                "认证服务暂时不可用",
+                status_code=503,
+                code="AUTH_SERVICE_UNAVAILABLE",
+            )
+
         return f(*args, **kwargs)
 
+    decorated._requires_auth = True
     return decorated
 
 
 def require_role(*roles: str):
-    """要求当前用户具有指定角色之一的装饰器工厂。
-
-    必须在 @require_auth 之后使用。
-
-    Args:
-        *roles: 允许的角色列表，如 'admin', 'teacher'。
-
-    Returns:
-        装饰器函数。
-    """
     def decorator(f):
         @functools.wraps(f)
         def decorated(*args, **kwargs):
             current_role = g.current_user.get("role", "")
             if current_role not in roles:
-                return error_response("无权执行此操作", status_code=403)
+                return error_response(
+                    "无权执行此操作", status_code=403, code="ROLE_FORBIDDEN"
+                )
             return f(*args, **kwargs)
+
+        decorated._required_roles = frozenset(roles)
         return decorated
+
     return decorator

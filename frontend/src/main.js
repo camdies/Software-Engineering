@@ -3,10 +3,16 @@ import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import {
+  Checked, DataAnalysis, Document, List, Notebook,
+  Reading, Select, Tickets, Timer, UserFilled,
+} from '@element-plus/icons-vue'
 import axios from 'axios'
 
-import 'echarts'
+import { use } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { BarChart, LineChart, PieChart } from 'echarts/charts'
+import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import VueECharts from 'vue-echarts'
 
 import App from './App.vue'
@@ -22,6 +28,7 @@ import './styles/global.scss'
 axios.defaults.baseURL = (typeof __API_BASE__ !== 'undefined') ? __API_BASE__ : '/api'
 
 const app = createApp(App)
+use([CanvasRenderer, BarChart, LineChart, PieChart, GridComponent, LegendComponent, TooltipComponent])
 
 // Pinia MUST be installed before router, because the router's
 // beforeEach guard calls useAuthStore() which depends on Pinia.
@@ -31,8 +38,8 @@ app.use(router)
 app.use(ElementPlus, { locale: zhCn })
 app.component('v-chart', VueECharts)
 
-// Global registration of Element Plus icons
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+const icons = { Checked, DataAnalysis, Document, List, Notebook, Reading, Select, Tickets, Timer, UserFilled }
+for (const [key, component] of Object.entries(icons)) {
   app.component(key, component)
 }
 

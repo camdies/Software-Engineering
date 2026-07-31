@@ -27,7 +27,11 @@ def select_course():
     )
     if result.get("success"):
         return success_response(message=result["message"])
-    return error_response(result.get("message", "选课失败"))
+    return error_response(
+        result.get("message", "选课失败"),
+        status_code=result.get("status_code", 409),
+        code=result.get("code", "ENROLLMENT_REJECTED"),
+    )
 
 
 @enrollment_bp.route("/drop", methods=["POST"])
@@ -44,4 +48,8 @@ def drop_course():
     )
     if result.get("success"):
         return success_response(message=result["message"])
-    return error_response(result.get("message", "退课失败"))
+    return error_response(
+        result.get("message", "退课失败"),
+        status_code=result.get("status_code", 409),
+        code=result.get("code", "DROP_REJECTED"),
+    )

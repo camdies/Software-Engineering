@@ -175,7 +175,7 @@ const rankBarOpt = computed(() => {
     grid: { top: 8, right: 38, bottom: 8, left: 8, containLabel: true },
     tooltip: {
       ...chartBaseOpts().tooltip,
-      formatter: (p) => `<div style="font-weight:600;margin-bottom:4px">${p[0].name}</div>成绩 <b>${p[0].value}</b> 分`,
+      formatter: (p) => `${p[0].name}\n成绩 ${p[0].value} 分`,
     },
   }
 })

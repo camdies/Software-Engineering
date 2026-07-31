@@ -30,13 +30,11 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
-    clearSession()
-    // Don't call POST /auth/logout if we already cleared the session —
-    // the request would fire with a missing token and get a 401 back,
-    // triggering the interceptor's redirectToLogin alongside this one.
     try {
       await request.post('/auth/logout')
-    } catch (_) { /* ignore */ }
+    } finally {
+      clearSession()
+    }
   }
 
   function clearSession() {

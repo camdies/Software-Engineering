@@ -260,8 +260,9 @@
     ▼
 Flask (app_factory.py)
     │
-    ├─ @require_auth → JWT 解码 → g.current_user
+    ├─ @require_auth → JWT 解码 + 账号锁定/角色/token_version 实时校验
     ├─ @require_role → 角色校验
+    ├─ @require_plan_access → 课程计划资源所有权校验
     │
     ▼
 Blueprint 路由 (9个)
@@ -287,7 +288,10 @@ JSON Response → Axios 拦截器 → Pinia → Vue 组件渲染
 1. **双数据库支持**: `settings.py` 根据 `config.ini [database].driver` 切换 mssql/mysql 连接字符串
 2. **SAEnum → String 迁移**: 所有模型的状态列改用 `String(10)` 而非 `SAEnum`, 避免 MSSQL 无原生 ENUM 导致的 LookupError
 3. **延迟数据库初始化**: `app_factory.py` 使用 `@before_request` 懒初始化 DB, 避免启动时 DB 不可达导致 Flask 无法启动
-4. **JWT 固定密钥**: `auth.py` 优先读 `config.ini` 中的 `jwt_secret`, 否则基于主机名 SHA256 生成 (保证重启后 token 不失效)
+4. **JWT 撤销与生产密钥**: JWT 携带 `token_version`；每次鉴权查询账号并核验锁定、当前角色和版本。登出、改密、重置、锁定会递增版本。生产启动拒绝弱密钥或缺失密钥。
 5. **Pinia 必须在 Router 之前安装**: `main.js` 先 `createPinia()` → `app.use(pinia)` → `app.use(router)` (否则登录页卡死)
-6. **选课并发安全**: `enrollment_controller.py` 使用 `SELECT ... FOR UPDATE` 行级锁配合事务保证容量不超额
+6. **选课并发安全**: 所有选课/退课事务固定按 `Student → CoursePlan → Enrollment` 锁序；MySQL 使用 `FOR UPDATE`，SQL Server 使用 `UPDLOCK, ROWLOCK, HOLDLOCK`，并由 `(student_id, plan_id)` 唯一约束最终兜底。
 7. **前端 API 地址可配置**: `vite.config.js` 通过 `define.__API_BASE__` 注入构建时常量 (支持 `VITE_API_TARGET` 指向远程后端)
+8. **当前学期单一真源**: `CurrentSemesterResolver` 要求恰好一条 `is_current=1`；零条或多条均返回 503。MySQL 生成列唯一约束与 SQL Server 过滤唯一索引保证最多一条。
+9. **课表统一网格**: 网页、打印与 Excel 均使用固定 11 节原子行。相同覆盖集和跨度才合并；同格课程跨度不同时不合并、不增行，并逐节展示所有覆盖课程。
+10. **旧库自动升级**: `DatabaseManager` 建立引擎后、首次 ORM 查询前调用 `schema_upgrade.py`，幂等补齐新增列和约束；若检测到多个当前学期等不安全状态则拒绝启动并返回 503。

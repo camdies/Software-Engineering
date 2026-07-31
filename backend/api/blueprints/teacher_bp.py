@@ -12,6 +12,7 @@ from flask import Blueprint, request, g
 
 from backend.api.response import success_response, error_response
 from backend.api.auth import require_auth, require_role
+from backend.api.access_policy import require_plan_access
 from backend.controllers.teacher_controller import TeacherController
 from backend.models.base import DatabaseManager
 from backend.models.grade import Grade
@@ -36,8 +37,11 @@ def get_teaching_plans():
 @teacher_bp.route("/plans/<int:plan_id>/students", methods=["GET"])
 @require_auth
 @require_role("teacher")
+@require_plan_access("roster", source="path")
 def get_enrolled_students(plan_id):
-    result = TeacherController().get_enrolled_students(plan_id)
+    result = TeacherController().get_enrolled_students(
+        g.current_user["user_id"], plan_id
+    )
     return success_response({"items": result})
 
 
@@ -61,6 +65,7 @@ def get_teacher_course_list():
 @teacher_bp.route("/grades", methods=["GET"])
 @require_auth
 @require_role("teacher")
+@require_plan_access("grades", source="query")
 def get_course_grades():
     """获取某课程下所有学生的成绩（含已录入和未录入）。"""
     plan_id = request.args.get("plan_id", type=int)
@@ -139,6 +144,7 @@ def submit_course_plan():
 @teacher_bp.route("/course-plan/<int:plan_id>", methods=["PUT"])
 @require_auth
 @require_role("teacher")
+@require_plan_access("update", source="path")
 def update_course_plan(plan_id):
     data = request.get_json(silent=True) or {}
     db = DatabaseManager.get_instance()

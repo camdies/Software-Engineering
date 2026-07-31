@@ -20,6 +20,7 @@ export function chartBaseOpts(overrides = {}) {
     animationEasing: 'cubicOut',
     color: chartPalette,
     tooltip: {
+      renderMode: 'richText',
       backgroundColor: 'rgba(255,255,255,0.96)',
       borderColor: '#e4e7ec',
       borderWidth: 1,

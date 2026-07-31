@@ -255,6 +255,15 @@ goto :wait_mysql
 :mysql_ready
 echo  MySQL is ready.
 
+:: --- Upgrade persistent database schema ---
+echo  Checking database schema...
+python run.py --upgrade-db-only
+if %errorlevel% neq 0 (
+    echo  [ERROR] Database schema upgrade failed. See logs for details.
+    pause
+    exit /b 1
+)
+
 :: --- Start Flask ---
 echo  Starting Flask server...
 start "EduMgmt Flask" python run.py

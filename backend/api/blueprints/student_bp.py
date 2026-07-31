@@ -12,6 +12,8 @@ from backend.api.response import success_response
 from backend.api.auth import require_auth, require_role
 from backend.controllers.student_controller import StudentController
 from backend.controllers.stats_controller import StatsController
+from backend.models.base import DatabaseManager
+from backend.services.semester_resolver import CurrentSemesterResolver
 
 student_bp = Blueprint("student", __name__, url_prefix="/api/student")
 
@@ -21,6 +23,9 @@ student_bp = Blueprint("student", __name__, url_prefix="/api/student")
 @require_role("student")
 def get_available_courses():
     semester = request.args.get("semester")
+    if not semester:
+        with DatabaseManager.get_instance().get_session() as session:
+            semester = CurrentSemesterResolver.resolve(session).semester
     department = request.args.get("department")
     credit_range = request.args.get("credit_range")
     weekday = request.args.get("weekday")
@@ -41,8 +46,20 @@ def get_available_courses():
 @require_auth
 @require_role("student")
 def get_my_courses():
-    result = StudentController().get_my_courses(g.current_user["user_id"])
-    return success_response({"items": result})
+    semester = request.args.get("semester")
+    if not semester:
+        with DatabaseManager.get_instance().get_session() as session:
+            semester_config = CurrentSemesterResolver.resolve(session)
+            semester = semester_config.semester
+            total_weeks = semester_config.total_weeks
+    else:
+        total_weeks = None
+    result = StudentController().get_my_courses(g.current_user["user_id"], semester)
+    return success_response({
+        "items": result,
+        "semester": semester,
+        "total_weeks": total_weeks,
+    })
 
 
 @student_bp.route("/grades", methods=["GET"])

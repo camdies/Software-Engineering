@@ -1,6 +1,6 @@
 # EduMgmt System v3.0 — Complete API Documentation
 
-> 总端点: 48
+> 总端点: 52（以 `app.url_map` 与 `ACCESS_POLICY_MANIFEST` 的闭包测试为准）
 > **Auth**: JWT Bearer token (HS256, 24h expiry)  
 > **Content-Type**: `application/json` (except file uploads)  
 > **Charset**: UTF-8  
@@ -19,12 +19,18 @@ Authorization: Bearer <token>
 
 **Success** (HTTP 200):
 ```json
-{ "success": true, "data": <any>, "message": "操作成功" }
+{ "success": true, "data": "<any>", "message": "操作成功", "request_id": "..." }
 ```
 
-**Error** (HTTP 4xx):
+**Error** (HTTP 4xx/5xx):
 ```json
-{ "success": false, "data": null, "message": "error description" }
+{
+  "success": false,
+  "code": "STABLE_MACHINE_CODE",
+  "message": "error description",
+  "data": null,
+  "request_id": "..."
+}
 ```
 
 ### HTTP Status Codes
@@ -32,11 +38,14 @@ Authorization: Bearer <token>
 | Code | Meaning |
 |------|---------|
 | 200 | Success |
-| 400 | Bad request (validation error) |
-| 401 | Missing or expired token |
-| 403 | Account locked or insufficient role |
+| 400 | Malformed request |
+| 401 | Missing, expired, locked, or revoked token |
+| 403 | Role or resource-ownership denial |
 | 404 | Resource not found |
-| 500 | Internal server error |
+| 409 | Business-state conflict (duplicate/full/time conflict/closed) |
+| 422 | Well-formed but semantically invalid input |
+| 500 | Unexpected internal or export failure |
+| 503 | Database, authorization lookup, or required configuration unavailable |
 
 ---
 
@@ -608,19 +617,28 @@ Score distribution. **Auth**: JWT (teacher, admin).
 ---
 
 #### POST `/api/stats/export`
-Export stats as Excel. **Auth**: JWT (any role).
+Export stats as Excel. The endpoint enforces role and resource ownership.
 
 ```json
 { "type": "class", "plan_id": 1 }
 ```
 ```json
-{ "type": "academic", "student_id": "STU001" }
+{ "type": "academic" }
 ```
 ```json
-{ "type": "schedule" }
+{ "type": "schedule", "semester": "2026-2027-1" }
 ```
 
-**Response**: File download (`.xlsx`).
+Student exports always derive the student identity from the JWT and reject a
+client-supplied `student_id` with `422 TARGET_ID_NOT_ALLOWED`. Teachers may only
+export class statistics for plans they own. An administrator performing a
+delegated academic/schedule export must supply `student_id` and `reason`; the
+actor, target, type, semester, reason, IP, result, time, and request ID are
+written to `operation_log`.
+
+**Response**: validated file download (`.xlsx`). Export files are reopened and
+checked for ZIP signature, minimum size, sheet, headers, representative cells,
+and merge ranges before being returned.
 
 ---
 

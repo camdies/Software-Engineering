@@ -213,6 +213,15 @@ python run.py
 # 打开 http://localhost:5000
 ```
 
+已有数据库会在启动时自动执行幂等的增量结构检查。也可以在启动前手动运行：
+
+```powershell
+python run.py --upgrade-db-only
+```
+
+该命令只补充当前版本所需的列和约束，不会重建数据表；若发现多条
+`semester_config.is_current=1`，会拒绝自动选择并要求先修正数据。
+
 ### 5.3 前端热更新开发模式
 
 修改前端代码时，每次 `npm run build` 太慢。用 Vite 开发服务器实现秒级热更新：
@@ -255,7 +264,9 @@ grade（成绩）
 **设计要点：**
 - 同一门课可以有多条 `course_plan`（不同学期、不同班级）
 - `course_plan.status` 为"已通过"后，学生才可见
-- 选课使用 `SELECT ... FOR UPDATE` 行级锁防超额
+- 选课/退课固定按 `Student → CoursePlan → Enrollment` 锁序；MySQL 使用
+  `SELECT ... FOR UPDATE`，SQL Server 使用 `UPDLOCK, ROWLOCK, HOLDLOCK`。
+  `(student_id, plan_id)` 唯一约束是最终并发兜底。
 
 ### 6.2 选课流程（最复杂的业务）
 

@@ -13,6 +13,7 @@ from flask import Blueprint, request, g
 
 from backend.api.response import success_response, error_response
 from backend.api.auth import require_auth, require_role
+from backend.api.access_policy import require_plan_access
 from backend.controllers.grade_controller import GradeController
 
 grade_bp = Blueprint("grade", __name__, url_prefix="/api/grade")
@@ -21,6 +22,7 @@ grade_bp = Blueprint("grade", __name__, url_prefix="/api/grade")
 @grade_bp.route("/record", methods=["POST"])
 @require_auth
 @require_role("teacher")
+@require_plan_access("grade_write", source="json")
 def record_grade():
     data = request.get_json(silent=True) or {}
     student_id = (data.get("student_id") or "").strip()
@@ -41,6 +43,7 @@ def record_grade():
 @grade_bp.route("/batch", methods=["POST"])
 @require_auth
 @require_role("teacher")
+@require_plan_access("grade_write", source="form")
 def batch_record_grade():
     plan_id = request.form.get("plan_id", type=int)
     if not plan_id:

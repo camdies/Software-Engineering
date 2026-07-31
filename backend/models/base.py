@@ -43,8 +43,23 @@ class DatabaseManager:
         self._engine = None
         self._Session = None
         self._driver = "mysql"
-        self._ensure_models_loaded()
-        self._init_engine()
+        try:
+            self._ensure_models_loaded()
+            self._init_engine()
+            self._upgrade_existing_schema()
+        except Exception:
+            if self._engine is not None:
+                self._engine.dispose()
+            # A transient database or migration failure must be retryable.
+            self._initialized = False
+            raise
+
+    def _upgrade_existing_schema(self):
+        """Bring persistent installations in sync before any ORM query."""
+        from backend.config.schema_upgrade import ensure_schema_current
+
+        ensure_schema_current(self._engine, self._driver)
+        logger.info("数据库结构检查/升级完成")
 
     def _ensure_models_loaded(self):
         """Import all models so string-based relationship() references resolve.

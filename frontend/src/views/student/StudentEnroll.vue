@@ -224,6 +224,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Filter, List } from '@element-plus/icons-vue'
 import request from '@/utils/request'
+import { invalidateRefresh } from '@/composables/useStaleRefresh'
 
 const weekdayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 const semesterOptions = ['2026-2027-1', '2025-2026-2', '2025-2026-1']
@@ -322,6 +323,7 @@ async function doEnroll(course) {
     const res = await request.post('/enrollment/select', { plan_id: course.plan_id })
     if (res.success) {
       ElMessage.success(res.message || '选课成功')
+      invalidateRefresh('schedule', 'statistics', 'enrollment')
       detailVisible.value = false; expandedPlanId.value = null
       await fetchMyCourses(); await fetchData()
     }
@@ -335,6 +337,7 @@ async function doDrop(course) {
     const res = await request.post('/enrollment/drop', { plan_id: course.plan_id })
     if (res.success) {
       ElMessage.success(res.message || '退课成功')
+      invalidateRefresh('schedule', 'statistics', 'enrollment')
       detailVisible.value = false; expandedPlanId.value = null
       await fetchMyCourses(); await fetchData()
     }

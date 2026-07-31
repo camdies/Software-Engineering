@@ -30,7 +30,15 @@ if __name__ == "__main__":
                         help='Port (default 5000)')
     parser.add_argument('--debug', action='store_true',
                         help='启用 Flask debug 模式（热重载）')
+    parser.add_argument('--upgrade-db-only', action='store_true',
+                        help='仅检查并升级数据库结构，然后退出')
     args = parser.parse_args()
+
+    if args.upgrade_db_only:
+        from backend.models.base import DatabaseManager
+        DatabaseManager.get_instance()
+        print("Database schema is current.")
+        raise SystemExit(0)
 
     host = '0.0.0.0' if args.public else '127.0.0.1'
     print("=" * 60)

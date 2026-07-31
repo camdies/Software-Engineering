@@ -13,6 +13,7 @@ from flask import Blueprint, request, g
 
 from backend.api.response import success_response, error_response
 from backend.api.auth import require_auth, require_role
+from backend.api.access_policy import require_plan_access
 from backend.models.base import DatabaseManager
 from backend.models.password_reset_request import PasswordResetRequest
 from backend.models.user_account import UserAccount
@@ -91,6 +92,7 @@ def handle_password_reset(request_id):
                     user.password_hash = hash_password(Settings.get_instance().default_password)
                 user.is_locked = 0
                 user.login_fail_count = 0
+                user.token_version = int(user.token_version or 0) + 1
             reset_req.status = "已通过"
             log_msg = f"审核通过密码重置: user={reset_req.user_id}"
         else:
@@ -140,6 +142,7 @@ def get_course_plan_audit_list():
 @audit_bp.route("/course-plans/<int:plan_id>", methods=["POST"])
 @require_auth
 @require_role("admin")
+@require_plan_access("audit", source="path")
 def handle_course_plan(plan_id):
     body = request.get_json(silent=True) or {}
     action = body.get("action")

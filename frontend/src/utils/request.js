@@ -59,10 +59,15 @@ request.interceptors.response.use(
     }
     return data
   },
-  (error) => {
+  async (error) => {
     if (error.response) {
       const status = error.response.status
-      const msg = error.response.data?.message
+      let payload = error.response.data
+      if (payload instanceof Blob && payload.type.includes('json')) {
+        try { payload = JSON.parse(await payload.text()) } catch { /* retain blob */ }
+      }
+      error.apiError = payload && typeof payload === 'object' ? payload : null
+      const msg = error.apiError?.message
       if (status === 401) {
         if (!_redirecting) {
           ElMessage.error(msg || '登录已过期，请重新登录')
@@ -76,7 +81,16 @@ request.interceptors.response.use(
       } else if (status === 403) {
         ElMessage.error(msg || '权限不足')
       } else {
-        ElMessage.error(msg || '服务器错误')
+        const requestId = error.apiError?.request_id
+        ElMessage.error(`${msg || '服务器错误'}${requestId ? `（请求ID: ${requestId}）` : ''}`)
+        if (status >= 500) {
+          window.dispatchEvent(new CustomEvent('edumgmt:api-error', {
+            detail: {
+              message: msg || '服务器暂时不可用',
+              requestId: requestId || '',
+            },
+          }))
+        }
       }
     } else {
       ElMessage.error('网络异常')

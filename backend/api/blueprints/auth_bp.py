@@ -30,7 +30,9 @@ def login():
     if not result.get("success"):
         return error_response(result.get("message", "登录失败"))
 
-    token = create_token(result["user_id"], result["role"])
+    token = create_token(
+        result["user_id"], result["role"], result.get("token_version", 0)
+    )
     return success_response({
         "token": token,
         "role": result["role"],
@@ -42,7 +44,12 @@ def login():
 @require_auth
 def logout():
     user_id = g.current_user["user_id"]
-    AuthController().logout(user_id)
+    if not AuthController().logout(user_id):
+        return error_response(
+            "退出登录失败，请重试",
+            status_code=503,
+            code="LOGOUT_SERVICE_UNAVAILABLE",
+        )
     return success_response(message="已退出登录")
 
 

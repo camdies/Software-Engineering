@@ -84,6 +84,11 @@ CREATE TABLE dbo.semester_config (
 );
 GO
 
+CREATE UNIQUE INDEX UX_semester_single_current
+ON dbo.semester_config(is_current)
+WHERE is_current = 1;
+GO
+
 -- 默认学期（2026-2027第一学期，20周）
 INSERT INTO dbo.semester_config (semester, total_weeks, start_date, end_date, is_current, enrollment_open)
 VALUES (N'2026-2027-1', 20, '2026-09-01', '2027-01-17', 1, 0);
@@ -101,6 +106,7 @@ CREATE TABLE dbo.user_account (
     last_login      DATETIME2(0)   NULL,
     is_locked       TINYINT        NOT NULL DEFAULT 0,
     login_fail_count INT           NOT NULL DEFAULT 0,
+    token_version   INT            NOT NULL DEFAULT 0,
     created_at      DATETIME2(0)   NOT NULL DEFAULT SYSDATETIME(),
     CONSTRAINT PK_user_account PRIMARY KEY CLUSTERED (user_id)
 );
@@ -275,13 +281,18 @@ CREATE TABLE dbo.operation_log (
     user_id     NVARCHAR(20)   NOT NULL,
     log_type    NVARCHAR(10)   NOT NULL
                 CONSTRAINT CK_log_type
-                CHECK (log_type IN (N'登录', N'选课', N'成绩', N'审核', N'系统')),
+                CHECK (log_type IN (N'登录', N'选课', N'成绩', N'审核', N'系统', N'导出')),
     operation   NVARCHAR(200)  NOT NULL,
     result      NVARCHAR(10)   NOT NULL
                 CONSTRAINT CK_log_result
                 CHECK (result IN (N'成功', N'失败')),
     log_time    DATETIME2(0)   NOT NULL DEFAULT SYSDATETIME(),
     ip_address  NVARCHAR(50)   NULL,
+    target_id   NVARCHAR(20)   NULL,
+    resource_type NVARCHAR(30) NULL,
+    semester    NVARCHAR(20)   NULL,
+    reason      NVARCHAR(500)  NULL,
+    request_id  NVARCHAR(64)   NULL,
     created_at  DATETIME2(0)   NOT NULL DEFAULT SYSDATETIME(),
     CONSTRAINT PK_operation_log PRIMARY KEY CLUSTERED (log_id)
 );

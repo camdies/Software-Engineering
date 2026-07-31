@@ -86,6 +86,7 @@ class AuthController:
                     max_attempts = Settings.get_instance().max_login_attempts
                     if user.login_fail_count >= max_attempts:
                         user.is_locked = 1
+                        user.token_version = int(user.token_version or 0) + 1
                         logger.warning(
                             f"账号{user_id}密码错误已达{max_attempts}次，已锁定"
                         )
@@ -118,6 +119,7 @@ class AuthController:
                     "success": True,
                     "role": role,
                     "user_id": user_id,
+                    "token_version": int(user.token_version or 0),
                     "message": "登录成功",
                 }
 
@@ -143,6 +145,10 @@ class AuthController:
             # 清除内存中的会话信息
             self._session_store.pop(user_id, None)
             with self._db.get_session() as session:
+                user = session.query(UserAccount).filter_by(user_id=user_id).first()
+                if user is None:
+                    return False
+                user.token_version = int(user.token_version or 0) + 1
                 self._write_log(session, user_id, "登录",
                                 f"用户{user_id}登出", "成功", "")
             logger.info(f"用户{user_id}登出成功")
@@ -237,6 +243,7 @@ class AuthController:
 
                 # 更新密码
                 user.password_hash = hash_password(new_pwd)
+                user.token_version = int(user.token_version or 0) + 1
                 self._write_log(session, user_id, "系统", "修改密码", "成功",
                                 "")
                 logger.info(f"用户{user_id}密码修改成功")
@@ -268,6 +275,7 @@ class AuthController:
                 user.password_hash = hash_password(default_pwd)
                 user.is_locked = 0
                 user.login_fail_count = 0
+                user.token_version = int(user.token_version or 0) + 1
                 self._write_log(session, admin_id, "系统",
                                 f"重置{user_id}密码", "成功", "")
                 logger.info(f"管理员{admin_id}重置了{user_id}的密码")
@@ -325,23 +333,15 @@ class AuthController:
                    operation: str, result: str, ip_address: str) -> None:
         """写入操作日志，失败不影响主流程。"""
         try:
-            log_entry = OperationLog(
-                user_id=user_id,
-                log_type=log_type,
-                operation=operation,
-                result=result,
-                log_time=datetime.now(),
-                ip_address=ip_address,
-            )
-            session.add(log_entry)
-            # 立即 flush 以便发现问题时 expunge，否则 commit 阶段才报错会
-            # 回滚整个事务（包括登录成功的 user 状态更新）。
-            session.flush()
+            with session.begin_nested():
+                session.add(OperationLog(
+                    user_id=user_id,
+                    log_type=log_type,
+                    operation=operation,
+                    result=result,
+                    log_time=datetime.now(),
+                    ip_address=ip_address,
+                ))
+                session.flush()
         except Exception:
-            session.rollback()
-            # 把污染对象踢出 session，后续 commit 不受影响
-            try:
-                session.expunge(log_entry)
-            except Exception:
-                pass
             logger.warning(f"操作日志写入失败（已跳过）: user={user_id} {operation}")

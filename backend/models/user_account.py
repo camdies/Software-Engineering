@@ -57,6 +57,12 @@ class UserAccount(Base):
         default=0,
         comment="连续登录失败次数",
     )
+    token_version = Column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="JWT 撤销版本；账号安全状态变更时递增",
+    )
     created_at = Column(
         DateTime,
         default=datetime.now,
@@ -87,6 +93,7 @@ class UserAccount(Base):
             ),
             "is_locked": self.is_locked,
             "login_fail_count": self.login_fail_count,
+            "token_version": self.token_version,
             "created_at": (
                 self.created_at.isoformat() if self.created_at else None
             ),

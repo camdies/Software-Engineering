@@ -18,7 +18,8 @@ default_total_weeks = 20
 default_password = 123456
 
 [web]
-jwt_secret =
+# Production requires a unique random secret of at least 32 characters.
+jwt_secret = REPLACE_WITH_AT_LEAST_32_RANDOM_CHARACTERS
 jwt_expiration_hours = 24
 
 [enrollment]

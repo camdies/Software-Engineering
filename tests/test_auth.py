@@ -80,6 +80,15 @@ class TestAuth(unittest.TestCase):
         result = AuthController().change_password("STU001", "old", "12345")
         self.assertFalse(result["success"]); self.assertIn("长度", result["message"])
 
+    def test_logout_increments_token_version(self):
+        from backend.controllers.auth_controller import AuthController
+
+        session_mock = MagicMock(); self._mock_session(session_mock)
+        user = MagicMock(token_version=3)
+        session_mock.query.return_value.filter_by.return_value.first.return_value = user
+        self.assertTrue(AuthController().logout("STU001"))
+        self.assertEqual(user.token_version, 4)
+
 
 if __name__ == "__main__":
     unittest.main()

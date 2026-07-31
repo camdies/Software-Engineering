@@ -91,6 +91,10 @@ sqlalchemy.exc.OperationalError: (2003, "Can't connect to MySQL server on 'local
 - 如果端口被占用：`netstat -ano | findstr 3306` 找到 PID → 任务管理器结束进程
 - 如果密码错误：确认 `config.ini` 中 `password = Cairenbin2005`
 
+若出现 `Unknown column 'user_account.token_version'`，说明代码已升级但持久化
+数据库仍是旧结构。启动脚本会自动升级；也可在项目根目录执行
+`python run.py --upgrade-db-only`。不要重新导入初始化 SQL，否则会覆盖现有数据。
+
 ### 问题 2: 中文乱码
 
 **现象**: 页面显示 `???` 或 `æ±‰å­—`
