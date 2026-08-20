@@ -5,6 +5,7 @@ logs/
 *.log
 .idea/
 .vscode/
+dist-bundle/
 *.swp
 *.swo
 .DS_Store

@@ -1,0 +1,46 @@
+name: quality-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test-password
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -ptest-password"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      EDUMGMT_TEST_MYSQL_URL: mysql+pymysql://root:test-password@127.0.0.1:3306/course_management_db?charset=utf8mb4
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: pip install -r requirements.txt pytest coverage diff-cover
+      - run: sudo apt-get update && sudo apt-get install -y mysql-client
+      - name: Initialize MySQL schema
+        run: mysql -h127.0.0.1 -uroot -ptest-password < backend/config/init_database_mysql.sql
+      - name: Compile backend
+        run: python -m compileall -q backend run.py run_prod.py
+      - name: Backend regression suite
+        run: coverage run --branch -m pytest tests/ -q
+      - name: Real MySQL enrollment locking gate
+        run: coverage run --branch --append -m pytest integration_tests/test_enrollment_mysql.py -q
+      - name: Build coverage report
+        run: coverage xml
+      - name: Changed backend coverage gate
+        if: github.event_name == 'pull_request'
+        run: diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=90
+      - name: Frontend tests and production build
+        working-directory: frontend
+        run: npm ci && npm test && npm run build
